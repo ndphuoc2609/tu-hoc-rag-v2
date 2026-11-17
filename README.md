@@ -29,24 +29,32 @@ cp .env.example .env   # DATABASE_URL trỏ tới Postgres local, điền key
 App tự chạy migration + seed 10 môn lúc startup (`CREATE EXTENSION vector`
 nếu được; không được thì log cảnh báo và fallback FTS + TF-IDF, không crash).
 
-## Deploy lên Render (Blueprint)
+## Deploy lên Render (Blueprint) + Neon Postgres
+
+DB dùng **Neon Postgres**, không dùng Postgres free của Render (hết hạn sau
+90 ngày). `render.yaml` chỉ khai web service; `DATABASE_URL` bạn tự set.
 
 1. Đẩy code lên GitHub (repo private `ndphuoc2609/tu-hoc-rag-v2`).
-2. Render Dashboard → New → Blueprint → chọn repo → Apply.
-   `render.yaml` đã khai sẵn: web service (Docker) + Postgres free plan 16.
-3. Vào service → Environment → thêm `OPENROUTER_API_KEY` (key thật của bạn),
-   giữ `OPENROUTER_MODEL=openai/gpt-6-luna`. `DATABASE_URL` Render tự gắn
-   từ database `tuhoc-db`.
-4. Deploy xong, mở URL Render cấp → đăng ký tài khoản → dùng.
+2. Tạo DB Neon: Neon console → New Project → tên `tuhoc-rag-v2`
+   (region Singapore cho gần VN) → tạo database `tuhoc` → copy connection
+   string dạng pooled (có `sslmode=require`). **Không dán connection
+   string vào chat** — nó chứa mật khẩu.
+3. Render Dashboard → New → Blueprint → chọn repo → Apply.
+4. Vào service → Environment → thêm 2 biến:
+   - `DATABASE_URL` = connection string Neon vừa copy
+   - `OPENROUTER_API_KEY` = key thật của bạn
+   Giữ `OPENROUTER_MODEL=openai/gpt-6-luna`.
+5. Deploy xong, mở URL Render cấp → đăng ký tài khoản → dùng.
+   App tự chạy migration + seed 10 môn lúc startup. Trên Neon, pgvector
+   bật bằng `CREATE EXTENSION vector;` trong Neon SQL Editor (1 lần) —
+   app cũng tự thử chạy lúc startup; nếu chưa bật được thì app log cảnh
+   báo và fallback FTS, không crash.
 
 Lưu ý Render:
 - Free web service ngủ sau ~15 phút không có traffic, lần mở đầu sẽ chậm.
-- Free Postgres hết hạn sau 90 ngày (Render free) — cần nâng cấp nếu dùng lâu.
 - Filesystem của Render là ephemeral: file gốc không được lưu lên disk,
   text trích ra đã lưu vào DB nên không mất dữ liệu khi restart.
-- `CREATE EXTENSION vector`: app tự chạy lúc startup. Nếu Render báo lỗi
-  quyền, vào Render Postgres → Shell chạy `CREATE EXTENSION vector;`
-  rồi redeploy. Nếu vẫn không bật được, app tự fallback FTS, không crash.
+- Chạy local thì điền `DATABASE_URL` Neon vào `.env` (xem `.env.example`).
 
 ## Thử nhanh bằng curl (sau khi đăng ký lấy token)
 
