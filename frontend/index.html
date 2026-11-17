@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TuHoc — Học từ tài liệu của bạn</title>
+<meta name="description" content="TuHoc: tạo môn học, đẩy tài liệu, hỏi đáp trực tiếp trên tài liệu, làm quiz, chấm tự luận theo barem.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Lexend:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></symbol>
+<symbol id="i-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h1"/></symbol>
+<symbol id="i-quiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.7.3-.9.8-.9 1.7"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h13l-2.5 4L18 12H5"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2c1 4-4 6-4 11a4 4 0 0 0 8 0c0-2-1-3-1-3s3 1 3 5a6 6 0 0 1-12 0C6 8 12 6 12 2z"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 2 3 6.5 7 .8-5.2 4.8 1.4 7-6.2-3.6L5.8 21l1.4-7L2 9.3l7-.8z"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21C7 16.5 2 13 2 8.5A4.5 4.5 0 0 1 6.5 4c1.8 0 3.4 1 4.5 2.5C12.1 5 13.7 4 15.5 4A4.5 4.5 0 0 1 20 8.5c0 4.5-5 8-8 12.5z"/></symbol>
+<symbol id="i-gem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M12 21 8 9l4-6 4 6-4 12"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></symbol>
+</defs></svg>
+<!-- ============ LANDING (public) ============ -->
+<div id="landing" class="view active">
+  <header class="landing-top">
+    <div class="landing-top-inner">
+      <a class="brand" href="#" onclick="return false"><span class="brand-mark">T</span>TuHoc</a>
+      <nav style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" data-goto="auth">Đăng nhập</button>
+        <button class="btn btn-primary" data-goto="auth">Bắt đầu học</button>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="landing-hero">
+      <div>
+        <h1>Học đúng tài liệu của bạn, không học lan man.</h1>
+        <p class="lede">TuHoc giúp bạn đẩy sách giáo khoa và ghi chép lên, hỏi đáp trực tiếp trên tài liệu, làm quiz theo từng chương và được chấm tự luận theo đúng barem của giáo viên.</p>
+        <div class="hero-actions">
+          <button class="btn btn-accent" data-goto="auth">Bắt đầu học miễn phí</button>
+          <button class="btn btn-outline" id="demoBtn">Dùng thử không cần đăng nhập</button>
+        </div>
+        <div class="hero-facts">
+          <div class="fact"><b class="num">10</b><span>môn học có sẵn</span></div>
+          <div class="fact"><b class="num">5 phút</b><span>mỗi bài học</span></div>
+          <div class="fact"><b class="num">1–3–7 ngày</b><span>nhắc ôn lại câu sai</span></div>
+        </div>
+      </div>
+      <div class="hero-demo" aria-label="Ví dụ hỏi đáp">
+        <p class="label">VÍ DỤ HỎI ĐÁP — SINH 12</p>
+        <p class="q" style="margin-top:8px">Quang hợp là gì?</p>
+        <p class="a">Quang hợp là quá trình cây xanh dùng năng lượng ánh sáng để tổng hợp chất hữu cơ từ nước và khí cacbonic. Quá trình diễn ra ở lá, trong lục lạp.</p>
+        <p class="src"><b>Nguồn:</b> Sinh học 12, Chương 2 — Quang hợp, trang 42. AI chỉ trả lời từ tài liệu bạn đã đẩy lên, không bịa thêm.</p>
+      </div>
+    </section>
+    <section class="landing-sections">
+      <h2>Cách TuHoc hoạt động</h2>
+      <div class="steps">
+        <div class="step"><span class="n">Bước 1</span><h3>Đẩy tài liệu lên</h3><p>Tải file PDF, Word lên hoặc dán ghi chép. TuHoc chia theo chương và lập chỉ mục để hỏi đáp được ngay.</p></div>
+        <div class="step"><span class="n">Bước 2</span><h3>Học theo lộ trình</h3><p>Mỗi chương thành một đường đi gồm các bài 5 phút. Làm xong bài này mới mở bài sau, đúng kiểu Duolingo.</p></div>
+        <div class="step"><span class="n">Bước 3</span><h3>Được chấm và nhắc ôn</h3><p>Quiz trừ tim khi sai, cộng XP khi đúng. Tự luận được chấm từng tiêu chí theo barem, câu sai được nhắc lại sau 1, 3 và 7 ngày.</p></div>
+      </div>
+    </section>
+  </main>
+  <footer style="border-top:1px solid var(--border)">
+    <div style="max-width:1120px;margin:0 auto;padding:24px" class="meta">TuHoc — web tự học dùng RAG trên tài liệu của chính bạn. Bản demo dùng dữ liệu mẫu và ghi rõ là demo.</div>
+  </footer>
+</div>
+
+<!-- ============ AUTH ============ -->
+<div id="auth" class="view">
+  <header class="landing-top">
+    <div class="landing-top-inner">
+      <a class="brand" href="#" onclick="showView('landing');return false"><span class="brand-mark">T</span>TuHoc</a>
+      <button class="btn btn-ghost" data-goto="landing">Về trang chủ</button>
+    </div>
+  </header>
+  <main class="auth-wrap">
+    <div>
+      <h1 id="authTitle">Đăng nhập để học tiếp</h1>
+      <p style="color:var(--ink-2);margin-top:8px;max-width:52ch">Streak, XP và tài liệu của bạn được lưu theo tài khoản. Giáo viên đăng nhập để tạo lớp và chấm bài cho cả lớp.</p>
+      <div class="card" style="margin-top:24px">
+        <p class="label">DÀNH CHO GIÁO VIÊN</p>
+        <h3 style="margin-top:8px">Một lớp, chấm cả loạt</h3>
+        <p class="sub">Tạo lớp, giao bài, xem bảng xếp hạng tuần của lớp và chấm hàng loạt bài tự luận rồi xuất điểm.</p>
+      </div>
+    </div>
+    <div class="card auth-card">
+      <div class="role-pick" role="group" aria-label="Chọn vai trò">
+        <button type="button" id="roleStudent" aria-pressed="true" onclick="pickRole('student')"><b>Học sinh</b><span>Tự học, ôn thi</span></button>
+        <button type="button" id="roleTeacher" aria-pressed="false" onclick="pickRole('teacher')"><b>Giáo viên</b><span>Tạo lớp, chấm bài</span></button>
+      </div>
+      <div id="authError" class="error-box" hidden></div>
+      <form id="authForm">
+        <div class="field" id="nameField" hidden>
+          <label for="authName">Họ và tên</label>
+          <input class="input" id="authName" autocomplete="name" placeholder="Ví dụ: Nguyễn Đình Phước">
+        </div>
+        <div class="field">
+          <label for="authEmail">Email</label>
+          <input class="input" id="authEmail" type="email" autocomplete="email" placeholder="ban@vi-du.vn" required>
+        </div>
+        <div class="field">
+          <label for="authPassword">Mật khẩu</label>
+          <input class="input" id="authPassword" type="password" autocomplete="current-password" placeholder="Tối thiểu 6 ký tự" required>
+          <p class="hint">Mật khẩu chỉ gửi tới server của bạn qua HTTPS, không lưu trong trình duyệt.</p>
+        </div>
+        <button class="btn btn-accent btn-block" type="submit" id="authSubmit">Đăng nhập</button>
+      </form>
+      <hr class="divider">
+      <p style="font-size:14px;color:var(--ink-2)"><span id="authSwitchText">Chưa có tài khoản?</span>
+        <button class="btn btn-ghost btn-sm" type="button" id="authSwitch" style="min-height:32px">Đăng ký ngay</button></p>
+      <p style="font-size:14px;margin-top:8px"><button class="btn btn-ghost btn-sm" type="button" id="demoBtn2" style="min-height:32px">Dùng thử không cần đăng nhập</button></p>
+    </div>
+  </main>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="view">
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Điều hướng chính">
+      <a class="brand" href="#" onclick="go('dashboard');return false"><span class="brand-mark">T</span>TuHoc</a>
+      <p class="nav-section">HỌC TẬP</p>
+      <button class="nav-item" data-nav="dashboard" onclick="go('dashboard')"><svg class="ic-svg" aria-hidden="true"><use href="#i-home"/></svg>Trang chủ</button>
+      <button class="nav-item" data-nav="subjects" onclick="go('subjects')"><svg class="ic-svg" aria-hidden="true"><use href="#i-grid"/></svg>Môn học</button>
+      <button class="nav-item" data-nav="path" onclick="go('path')"><svg class="ic-svg" aria-hidden="true"><use href="#i-route"/></svg>Lộ trình</button>
+      <button class="nav-item" data-nav="quiz" onclick="go('quiz')"><svg class="ic-svg" aria-hidden="true"><use href="#i-quiz"/></svg>Làm quiz</button>
+      <button class="nav-item" data-nav="chat" onclick="go('chat')"><svg class="ic-svg" aria-hidden="true"><use href="#i-chat"/></svg>Hỏi đáp RAG</button>
+      <button class="nav-item" data-nav="docs" onclick="go('docs')"><svg class="ic-svg" aria-hidden="true"><use href="#i-doc"/></svg>Tài liệu</button>
+      <button class="nav-item" data-nav="essay" onclick="go('essay')"><svg class="ic-svg" aria-hidden="true"><use href="#i-pen"/></svg>Chấm tự luận</button>
+      <p class="nav-section">LỚP HỌC</p>
+      <button class="nav-item" data-nav="teacher" onclick="go('teacher')"><svg class="ic-svg" aria-hidden="true"><use href="#i-flag"/></svg>Lớp của tôi</button>
+      <button class="nav-item" data-nav="profile" onclick="go('profile')"><svg class="ic-svg" aria-hidden="true"><use href="#i-user"/></svg>Hồ sơ</button>
+      <div class="sidebar-foot"><span id="sideUser">Bạn đang dùng thử</span><br><button class="btn btn-ghost" onclick="logout()">Đăng xuất</button></div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn-outline btn-sm menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Mở menu"><svg class="ic-svg" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button>
+        <h1 id="topTitle">Trang chủ</h1>
+        <div class="spacer"></div>
+        <span class="stat-chip" title="Streak ngày học liên tiếp"><svg class="ic-svg" aria-hidden="true"><use href="#i-flame"/></svg><span class="num" id="chipStreak">7</span> ngày</span>
+        <span class="stat-chip hide-m" title="Điểm kinh nghiệm"><svg class="ic-svg" aria-hidden="true"><use href="#i-star"/></svg><span class="num" id="chipXp">1.240</span> XP</span>
+        <span class="stat-chip" title="Tim còn lại"><svg class="ic-svg" aria-hidden="true"><use href="#i-heart"/></svg><span class="num" id="chipHearts">5</span>/5</span>
+        <span class="stat-chip hide-m" title="Kim cương — đúng cả bài quiz được thưởng 5 gem, dùng 10 gem để hồi 1 tim"><svg class="ic-svg" aria-hidden="true"><use href="#i-gem"/></svg><span class="num" id="chipGems">86</span></span>
+      </header>
+
+      <main class="content">
+        <div id="demoBanner" class="banner" hidden><b>Chế độ demo.</b> Backend v2 chưa chạy nên màn hình đang dùng dữ liệu mẫu ghi rõ là demo. Khi backend chạy, dữ liệu thật sẽ thay thế.</div>
+
+        <!-- DASHBOARD -->
+        <section class="view active" id="view-dashboard">
+          <div class="view-head"><h2 id="dashHello">Chào buổi sáng, Minh Anh</h2><p id="dashGoalLine">Mục tiêu hôm nay: 30 XP. Câu ôn tập đang chờ 3 câu.</p></div>
+          <div class="kpi-row" role="group" aria-label="Tiến độ hôm nay">
+            <div><p class="label">STREAK</p><p class="value num">7 ngày</p><p class="delta">Tốt nhất: 21 ngày</p></div>
+            <div><p class="label">XP HÔM NAY</p><p class="value num" id="kpiXp">10 / 30</p><p class="delta" id="kpiXpDelta">Còn 20 XP tới mục tiêu</p></div>
+            <div><p class="label">TIM</p><p class="value num" id="kpiHearts">5 / 5</p><p class="delta">Sai 1 câu trừ 1 tim</p></div>
+            <div><p class="label">CÂU ĐẾN HẠN ÔN</p><p class="value num">3 câu</p><p class="delta">Nhắc lại sau 1–3–7 ngày</p></div>
+          </div>
+          <div style="height:16px"></div>
+          <div class="grid-2 top">
+            <div class="card">
+              <h3>Học tiếp</h3><p class="sub">Sinh 12 — Chương 2: Quang hợp, Bài 3: Pha tối</p>
+              <div class="progress-track" aria-label="Tiến độ chương 2: 40 phần trăm"><div class="progress-fill" style="width:40%"></div></div>
+              <p class="meta" style="margin-top:8px">Đã xong 2/5 bài · Còn 3 bài</p>
+              <div style="height:12px"></div>
+              <button class="btn btn-accent" onclick="go('path')">Học bài tiếp theo</button>
+              <button class="btn btn-outline" onclick="go('quiz')">Làm quiz nhanh</button>
+            </div>
+            <div class="card">
+              <h3>Câu đến hạn ôn hôm nay</h3><p class="sub">Ôn đúng sẽ hồi 1 tim và tăng khoảng nhắc lại.</p>
+              <div id="dueList"></div>
+              <div style="height:12px"></div>
+              <button class="btn btn-outline" onclick="startReview()">Ôn 3 câu này</button>
+            </div>
+          </div>
+          <div style="height:16px"></div>
+          <div class="card">
+            <h3>Môn đang học</h3>
+            <div id="dashSubjects"></div>
+          </div>
+        </section>
+
+        <!-- SUBJECTS -->
+        <section class="view" id="view-subjects">
+          <div class="view-head"><h2>Môn học</h2><p>Chọn một môn để mở lộ trình. Mỗi môn học từ chính tài liệu bạn đã đẩy lên.</p></div>
+          <div class="card" style="margin-bottom:16px">
+            <form id="createSubjectForm" style="display:flex;gap:8px;flex-wrap:wrap">
+              <input class="input" id="newSubjectName" placeholder="Tên môn mới, ví dụ: Tin học 11" style="flex:1;min-width:200px" aria-label="Tên môn mới">
+              <button class="btn btn-primary" type="submit">Tạo môn mới</button>
+            </form>
+            <p class="meta" style="margin-top:8px">Môn mới bắt đầu trống. Đẩy tài liệu ở màn Tài liệu rồi quay lại học.</p>
+          </div>
+          <div class="subject-grid" id="subjectGrid"></div>
+          <div class="empty" id="subjectEmpty" hidden><h3>Chưa có môn học nào</h3><p>Tạo môn đầu tiên ở trên, hoặc dùng thử với 10 môn mẫu.</p><button class="btn btn-accent" onclick="loadDemoSubjects()">Nạp 10 môn mẫu</button></div>
+        </section>
+
+        <!-- PATH -->
+        <section class="view" id="view-path">
+          <div class="view-head"><h2 id="pathTitle">Lộ trình — Sinh 12</h2><p id="pathSub">Chương 2: Quang hợp · 5 bài · mỗi bài 5 câu, khoảng 5 phút.</p></div>
+          <div class="card" style="margin-bottom:16px">
+            <label class="field" style="margin-bottom:0"><span class="label">CHỌN MÔN</span>
+              <select class="input" id="pathSubject" onchange="renderPath()" style="margin-top:6px"></select>
+            </label>
+            <div class="chapter-bar" id="chapterBar" style="margin-top:12px"></div>
+          </div>
+          <div class="path-wrap" id="pathWrap"></div>
+          <div style="height:16px"></div>
+          <div style="text-align:center"><button class="btn btn-accent" onclick="startQuiz()">Bắt đầu bài tiếp theo</button></div>
+        </section>
+
+        <!-- QUIZ -->
+        <section class="view" id="view-quiz">
+          <div class="view-head"><h2>Làm quiz</h2><p id="quizSub">Sinh 12 — Bài 3: Pha tối · Trả lời đúng cộng 10 XP, sai trừ 1 tim.</p></div>
+          <div class="card" style="margin-bottom:16px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <label class="label" for="quizSubject">MÔN</label>
+              <select class="input" id="quizSubject" style="flex:1;min-width:180px" onchange="loadQuizQuestions()"></select>
+              <button class="btn btn-outline" onclick="loadQuizQuestions()">Tạo 5 câu mới</button>
+            </div>
+          </div>
+          <div class="quiz-shell">
+            <div class="quiz-progress"><span class="label" id="quizCounter">Câu 1/5</span><div class="progress-track track"><div class="progress-fill" id="quizBar" style="width:20%"></div></div><span class="pill pill-red"><svg class="ic-svg" aria-hidden="true" style="width:13px;height:13px"><use href="#i-heart"/></svg> <span id="quizHearts">5</span></span></div>
+            <div id="quizBox"></div>
+            <div id="quizEmpty" class="empty" hidden><h3>Chưa có câu hỏi nào</h3><p>Môn này chưa có tài liệu để tạo quiz. Đẩy tài liệu lên trước, hoặc bấm tạo câu mẫu.</p><button class="btn btn-accent" onclick="loadQuizQuestions(true)">Tạo 5 câu mẫu</button></div>
+            <div id="quizDone" hidden></div>
+          </div>
+        </section>
+
+        <!-- CHAT -->
+        <section class="view" id="view-chat">
+          <div class="view-head"><h2>Hỏi đáp trên tài liệu</h2><p>Hỏi như dùng ChatGPT, nhưng TuHoc chỉ trả lời từ tài liệu bạn đã đẩy lên và trích đúng đoạn nguồn.</p></div>
+          <div class="chat-layout">
+            <div class="chat-box">
+              <div class="chat-log" id="chatLog" aria-live="polite"></div>
+              <div class="suggest" id="chatSuggests">
+                <button class="btn btn-outline" onclick="askSuggest('Quang hợp là gì?')">Quang hợp là gì?</button>
+                <button class="btn btn-outline" onclick="askSuggest('Pha sáng và pha tối khác nhau thế nào?')">Pha sáng và pha tối khác nhau thế nào?</button>
+                <button class="btn btn-outline" onclick="askSuggest('Cho ví dụ về quang hợp trong đời sống')">Cho ví dụ về quang hợp trong đời sống</button>
+              </div>
+              <form class="chat-input" id="chatForm">
+                <input class="input" id="chatInput" placeholder="Hỏi từ tài liệu Sinh 12…" aria-label="Câu hỏi cho trợ lý" autocomplete="off">
+                <button class="btn btn-accent" type="submit">Gửi</button>
+              </form>
+            </div>
+            <div class="card">
+              <h3>Tải tài liệu nhanh</h3><p class="sub">Kéo file PDF, Word, TXT hoặc MD vào đây. File sẽ được chia theo chương và lập chỉ mục.</p>
+              <div style="height:12px"></div>
+              <label class="field"><span class="label">CHỌN MÔN</span><select class="input" id="chatSubject" style="margin-top:6px"></select></label>
+              <div class="field"><span class="label">FILE TÀI LIỆU</span>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+                  <label for="chatFile" class="btn btn-outline file-btn" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('chatFile').click()}">Chọn file</label>
+                  <span class="meta" id="chatFileName">Chưa chọn file nào.</span>
+                </div>
+                <input type="file" id="chatFile" accept=".pdf,.docx,.txt,.md" class="file-input-hidden" aria-label="Chọn file tài liệu">
+              </div>
+              <button class="btn btn-outline btn-block" onclick="uploadFromChat()">Tải tài liệu lên</button>
+              <p class="meta" style="margin-top:12px" id="chatUploadMsg">Chưa chọn file. Hỗ trợ PDF, DOCX, TXT, MD, tối đa 50 MB mỗi file.</p>
+              <hr class="divider">
+              <h3>Tài liệu trong môn này</h3>
+              <div id="chatDocs" style="margin-top:8px"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DOCS -->
+        <section class="view" id="view-docs">
+          <div class="view-head"><h2>Quản lý tài liệu</h2><p>Toàn bộ tài liệu RAG của bạn. Xóa tài liệu sẽ xóa luôn các đoạn đã lập chỉ mục của nó.</p></div>
+          <div class="card" style="margin-bottom:16px">
+            <form id="docForm">
+              <div class="grid-2">
+                <label class="field"><span class="label">MÔN</span><select class="input" id="docSubject" style="margin-top:6px"></select></label>
+                <label class="field"><span class="label">TIÊU ĐỀ</span><input class="input" id="docTitle" placeholder="Ví dụ: Sinh học 12 — Chương 2" style="margin-top:6px"></label>
+              </div>
+              <div class="field"><span class="label">FILE (PDF / DOCX / TXT / MD)</span>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+                  <label for="docFile" class="btn btn-outline file-btn" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('docFile').click()}">Chọn file</label>
+                  <span class="meta" id="docFileName">Chưa chọn file nào.</span>
+                </div>
+                <input type="file" id="docFile" accept=".pdf,.docx,.txt,.md" class="file-input-hidden" aria-label="Chọn file tài liệu">
+              </div>
+              <label class="field"><span class="label">HOẶC DÁN NỘI DUNG</span><textarea class="input" id="docText" placeholder="Dán nội dung tài liệu vào đây nếu không có file…"></textarea></label>
+              <button class="btn btn-accent" type="submit">Tải lên và lập chỉ mục</button>
+              <span class="meta" id="docMsg" style="margin-left:8px"></span>
+            </form>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tài liệu</th><th>Môn</th><th>Trạng thái</th><th class="num">Đoạn đã index</th><th></th></tr></thead>
+              <tbody id="docTable"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="docEmpty" hidden><h3>Chưa có tài liệu nào</h3><p>Tải file PDF hoặc Word đầu tiên lên để bắt đầu hỏi đáp và tạo quiz.</p></div>
+        </section>
+
+        <!-- ESSAY -->
+        <section class="view" id="view-essay">
+          <div class="view-head"><h2>Chấm tự luận theo barem</h2><p>Nhập đề, barem của giáo viên và bài làm. TuHoc chấm từng tiêu chí, trích đúng câu trong bài và gợi ý cách sửa để đủ điểm. Giáo viên là người chốt điểm cuối cùng.</p></div>
+          <div class="grid-2" style="align-items:start">
+            <div class="card">
+              <form id="essayForm">
+                <label class="field"><span class="label">MÔN</span><select class="input" id="essaySubject" style="margin-top:6px"></select></label>
+                <label class="field"><span class="label">ĐỀ BÀI</span><textarea class="input" id="essayPrompt" rows="2">Trình bày vai trò của quang hợp đối với sự sống trên Trái Đất.</textarea></label>
+                <label class="field"><span class="label">BAREM — MỖI DÒNG MỘT TIÊU CHÍ</span><textarea class="input" id="essayRubric" rows="5">Nêu đúng khái niệm quang hợp - 2đ
+Phân tích vai trò với cây xanh và môi trường - 3đ
+Liên hệ thực tế, lấy ví dụ - 2đ
+Trình bày rõ ràng, đúng chính tả - 1đ</textarea><p class="hint">Định dạng: tên tiêu chí - số điểm. Tổng ví dụ trên là 8 điểm.</p></label>
+                <label class="field"><span class="label">BÀI LÀM</span><textarea class="input" id="essayText" rows="6">Quang hợp là quá trình cây xanh dùng năng lượng ánh sáng để tổng hợp chất hữu cơ từ nước và khí cacbonic. Nhờ quang hợp, cây tạo ra oxi cho con người hít thở và tạo ra thức ăn cho các sinh vật khác. Nếu không có quang hợp, sự sống trên Trái Đất sẽ không duy trì được.</textarea></label>
+                <button class="btn btn-accent" type="submit" id="essaySubmit">Chấm bài này</button>
+                <button class="btn btn-ghost" type="button" onclick="fillEssaySample()">Điền bài mẫu</button>
+              </form>
+              <div id="essayError" class="error-box" style="margin-top:12px" hidden></div>
+            </div>
+            <div class="card" id="essayResult">
+              <p class="label">KẾT QUẢ CHẤM</p>
+              <div id="essayResultBody">
+                <div class="empty" style="margin-top:12px"><h3>Chưa chấm bài nào</h3><p>Nhập đề, barem và bài làm rồi bấm “Chấm bài này”.</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TEACHER -->
+        <section class="view" id="view-teacher">
+          <div class="view-head"><h2>Lớp của tôi</h2><p id="teacherSub">Lớp 12A1 — Sinh học · 38 học sinh · Tuần này lớp đang đứng hạng Đồng.</p></div>
+          <div class="grid-2" style="align-items:start">
+            <div>
+              <div class="card">
+                <h3>Bảng xếp hạng tuần — League Đồng</h3><p class="sub">Xếp theo XP trong tuần này. Top 3 cuối tuần được lên hạng Bạc.</p>
+                <div id="leagueList" style="margin-top:12px"></div>
+              </div>
+              <div style="height:16px"></div>
+              <div class="card">
+                <h3>Chấm hàng loạt</h3><p class="sub">12 bài tự luận đang chờ chấm. TuHoc chấm trước theo barem, giáo viên duyệt và sửa điểm rồi gửi cho cả lớp.</p>
+                <div style="height:12px"></div>
+                <button class="btn btn-accent" onclick="gradeBatch()">Chấm 12 bài chờ duyệt</button>
+                <button class="btn btn-outline" onclick="exportCSV()">Xuất điểm ra file CSV</button>
+                <div id="batchMsg" style="margin-top:12px"></div>
+              </div>
+              <div style="height:16px"></div>
+              <div class="card">
+                <h3>Bài đã giao</h3>
+                <div id="assignList" style="margin-top:8px"></div>
+                <hr class="divider">
+                <h3>Bài tự luận chờ duyệt</h3>
+                <div id="pendingList" style="margin-top:8px"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+                <h3>Lớp học</h3><button class="btn btn-outline btn-sm" onclick="createClass()">Tạo lớp mới</button>
+              </div>
+              <div id="classList" style="margin-top:12px"></div>
+              <hr class="divider">
+              <h3>Học sinh cần chú ý</h3>
+              <div id="studentTable"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PROFILE -->
+        <section class="view" id="view-profile">
+          <div class="view-head"><h2>Hồ sơ và cài đặt</h2><p>Thông tin tài khoản, mục tiêu học mỗi ngày và dữ liệu học tập của bạn.</p></div>
+          <div class="grid-2" style="align-items:start">
+            <div class="card">
+              <div style="display:flex;gap:16px;align-items:center">
+                <span class="avatar-lg" id="profileAvatar">MA</span>
+                <div><h3 id="profileName">Minh Anh</h3><p class="meta" id="profileEmail">minhanh@vi-du.vn · Học sinh</p></div>
+              </div>
+              <hr class="divider">
+              <form id="profileForm">
+                <label class="field"><span class="label">MỤC TIÊU MỖI NGÀY</span>
+                  <select class="input" id="dailyGoal" style="margin-top:6px"><option value="10">10 XP — Nhẹ nhàng</option><option value="30" selected>30 XP — Đều đặn</option><option value="50">50 XP — Chăm chỉ</option><option value="100">100 XP — Tăng tốc ôn thi</option></select>
+                </label>
+                <label class="field"><span class="label">NHẮC ÔN TẬP</span>
+                  <select class="input" id="remindTime" style="margin-top:6px"><option>19:00 mỗi ngày</option><option>07:30 mỗi sáng</option><option>Tắt nhắc</option></select>
+                </label>
+                <button class="btn btn-primary" type="submit">Lưu cài đặt</button>
+                <span class="meta" id="profileMsg" style="margin-left:8px"></span>
+              </form>
+            </div>
+            <div class="card">
+              <h3>Tổng kết học tập</h3>
+              <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);margin-top:12px">
+                <div><p class="label">TỔNG XP</p><p class="value num">1.240</p></div>
+                <div><p class="label">STREAK DÀI NHẤT</p><p class="value num">21 ngày</p></div>
+                <div style="border-top:1px solid var(--border)"><p class="label">CÂU ĐÃ LÀM</p><p class="value num">312</p></div>
+                <div style="border-top:1px solid var(--border)"><p class="label">TỈ LỆ ĐÚNG</p><p class="value num">78%</p></div>
+              </div>
+              <hr class="divider">
+              <h3>Môn yếu nhất</h3><p class="sub" style="margin-top:4px">Hóa 12 — Chương 3: Đại cương kim loại, đúng 54%. TuHoc gợi ý ôn lại 2 bài trong chương này.</p>
+              <div style="height:12px"></div>
+              <button class="btn btn-outline" onclick="go('path', 5)">Ôn Hóa 12 ngay</button>
+              <hr class="divider">
+              <button class="btn btn-danger" onclick="logout()">Đăng xuất khỏi TuHoc</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <nav class="bottom-nav" aria-label="Điều hướng nhanh">
+    <button data-nav="dashboard" onclick="go('dashboard')"><svg class="ic-svg" aria-hidden="true"><use href="#i-home"/></svg>Trang chủ</button>
+    <button data-nav="subjects" onclick="go('subjects')"><svg class="ic-svg" aria-hidden="true"><use href="#i-grid"/></svg>Môn học</button>
+    <button data-nav="path" onclick="go('path')"><svg class="ic-svg" aria-hidden="true"><use href="#i-route"/></svg>Lộ trình</button>
+    <button data-nav="chat" onclick="go('chat')"><svg class="ic-svg" aria-hidden="true"><use href="#i-chat"/></svg>Hỏi đáp</button>
+    <button data-nav="profile" onclick="go('profile')"><svg class="ic-svg" aria-hidden="true"><use href="#i-user"/></svg>Hồ sơ</button>
+  </nav>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
