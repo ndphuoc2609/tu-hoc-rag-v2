@@ -456,7 +456,7 @@ td.num, th.num { text-align: right; white-space: nowrap; }
   /* N1: header landing chi giu 1 CTA o 390px */
   .landing-top-inner nav .btn-ghost { display: none; }
   /* N2: tieu de topbar khong gay dong */
-  .topbar h1 { font-size: 18px; white-space: nowrap; }
+  .topbar h1 { font-size: 18px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .kpi-row > div { padding: 12px 14px; }
   .kpi-row .delta { font-size: 12px; }
 }
@@ -511,3 +511,30 @@ html.anim [data-reveal].in-view { opacity: 1; transform: none; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
   html.anim [data-reveal] { opacity: 1; transform: none; }
 }
+
+/* ---------- hybrid path + chat 2 che do ---------- */
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pill-blue { background: var(--c-sky-soft); color: var(--c-sky-ink); }
+/* Segmented control: nut dang chon dung mau muc nhu chapter-bar (ink), khong pill mau. */
+.seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.seg button { min-height: 44px; min-width: 44px; padding: 6px 16px; border: 0; border-radius: 6px; background: transparent; font-weight: 600; font-size: 14px; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: #FAFAF9; }
+.mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 12px 0; }
+.scope-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.scope-bar[hidden] { display: none; }
+.row-between[hidden] { display: none; } /* display:flex cua .row-between de [hidden] — nut refresh chi hien khi mon co tai lieu */
+.scope-bar .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.msg .badge-row { margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+/* Panel de xuat lo trinh: card thuong + pill trang thai, khong border mau ben hong. */
+.proposal { margin-bottom: 16px; }
+.proposal .prop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.proposal .prop-note { font-size: 14px; color: var(--ink-2); margin-top: 6px; max-width: 70ch; }
+.prop-list { margin: 12px 0; }
+.prop-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px; border-bottom: 1px solid var(--border); min-height: 48px; cursor: pointer; }
+.prop-row:last-child { border-bottom: 0; }
+.prop-row input[type="checkbox"] { width: 20px; height: 20px; flex: none; margin-top: 2px; accent-color: var(--accent); }
+.prop-row .grow { flex: 1; min-width: 0; }
+.prop-row .title { font-weight: 600; display: block; }
+.prop-row .sub2 { font-size: 13px; color: var(--muted); display: block; }
+.prop-row.remove .title { color: var(--error); }
+.prop-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

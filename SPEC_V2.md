@@ -46,8 +46,25 @@ Frontend live mode luôn gửi Bearer token; chưa login = demo (không gọi AP
 - `DELETE /api/docs/{id}` → `{ok:true}` (xóa doc + chunks; chỉ owner hoặc
   teacher). `POST /api/docs/{id}/retry` → `{id,status,chunks}` (index lại từ
   text đã lưu; không còn text → 400).
-- `POST /api/subjects/{id}/chat {question}` → `{answer, sources, mode}`,
-  sources là list `{text, score}`. mode `rag_llm|retrieval_only|no_context`.
+- `POST /api/subjects/{id}/chat {question, mode?, doc_id?}` → `{answer, sources, mode}`,
+  sources là list `{text, doc_id, doc_title}`. mode `rag` (mặc định, như cũ:
+  `rag_llm|retrieval_only|no_context`) | `general` (không retrieve, Luna temp 0.7;
+  không key → `general_unavailable`) | `auto` (có hit → `auto_rag`, không hit →
+  `auto_general` với tiền tố "Không có trong tài liệu, đây là câu trả lời chung:").
+  `doc_id` lọc retrieval chỉ trong tài liệu đó (doc không thuộc môn → 404).
+- `GET /api/subjects/{id}/docs` → `[{id, title, status, chunks, created_at}]`
+  (tài liệu đã up của môn, để live mode liệt kê lại sau khi đăng nhập).
+- Hybrid path (bảng `path_proposals`, cột `lessons.source_doc_id`):
+  `POST /api/subjects {name, level?}` vẫn tạo khung generic 3 chương, có key thì
+  Luna sinh dàn ý (cap 5 chương/6 bài) lưu proposal `kind='outline'` pending,
+  không key → `outline_proposal: null`.
+  `GET /api/subjects/{id}/path/proposal` → proposal pending mới nhất hoặc null.
+  `POST /api/subjects/{id}/path/refresh` → proposal `kind='refresh'` từ outline
+  hiện tại + tối đa 5 doc (mỗi doc ~1200 ký tự đầu); chưa có doc → 400;
+  không key → 503. `POST /api/subjects/{id}/path/proposals/{pid}/apply
+  {change_ids}` → duyệt từng change; rỗng → rejected; outline apply THAY khung
+  generic cũ (xóa chapters/lessons rồi mới thêm), refresh apply incremental;
+  rename UPDATE giữ nguyên id (tiến độ môn tính theo số câu quiz đúng nên không mất).
 - `POST /api/subjects/{id}/quiz/generate {n=5}` → `{questions, mode}`.
   Chỉ sinh MCQ. **Không trả `answer_idx` về client** (frontend ép `null`);
   đáp án đúng chỉ nằm ở DB.

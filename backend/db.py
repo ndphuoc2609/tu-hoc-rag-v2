@@ -122,6 +122,14 @@ def init_db() -> bool:
         """)
         if HAS_VECTOR:
             c.execute("ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)")
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS path_proposals(
+            id SERIAL PRIMARY KEY, subject_id INTEGER NOT NULL REFERENCES subjects(id),
+            user_id INTEGER REFERENCES users(id), kind TEXT NOT NULL,
+            payload JSONB NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL);
+        """)
+        c.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS source_doc_id INTEGER REFERENCES docs(id)")
         # --- seed idempotent ---
         for name, chapters in SEED_SUBJECTS:
             row = c.execute("SELECT id FROM subjects WHERE name=%s AND is_seed", (name,)).fetchone()
@@ -180,38 +188,55 @@ def xp_week(c, user_id: int) -> int:
 
 
 # --- retrieval hybrid ---
-def retrieve_chunks(c, subject_id: int, query: str, k: int = 3):
-    """Tra top-k [{id, text, score}]. Vector + FTS, fallback TF-IDF."""
+def retrieve_chunks(c, subject_id: int, query: str, k: int = 3, doc_id: int | None = None):
+    """Tra top-k [{id, text, score, doc_id, doc_title}]. Vector + FTS, fallback TF-IDF.
+    doc_id: chi tim trong tai lieu do (chat trong tai lieu)."""
     from . import llm, rag
     merged: dict[int, dict] = {}
 
-    def add(cid, text, score):
+    def add(cid, text, score, did, dtitle):
         if cid not in merged or score > merged[cid]["score"]:
-            merged[cid] = {"id": cid, "text": text, "score": round(float(score), 3)}
+            merged[cid] = {"id": cid, "text": text, "score": round(float(score), 3),
+                           "doc_id": did, "doc_title": dtitle}
 
+    doc_filter = " AND ch.doc_id=%s" if doc_id is not None else ""
     if HAS_VECTOR and llm.has_key():
         vecs = llm.embed([query])
         if vecs and vecs[0]:
             vec_str = "[" + ",".join(str(float(x)) for x in vecs[0]) + "]"
+            params = [vec_str, subject_id] + ([doc_id] if doc_id is not None else [])
             try:
                 for r in c.execute(
-                        "SELECT id, text, embedding <=> %s::vector AS dist FROM chunks "
-                        "WHERE subject_id=%s AND embedding IS NOT NULL "
-                        "ORDER BY dist LIMIT 5", (vec_str, subject_id)):
-                    add(r["id"], r["text"], max(0.0, 1.0 - float(r["dist"])))
+                        "SELECT ch.id, ch.text, ch.doc_id, d.title AS doc_title, "
+                        "ch.embedding <=> %s::vector AS dist FROM chunks ch "
+                        "JOIN docs d ON d.id=ch.doc_id "
+                        "WHERE ch.subject_id=%s AND ch.embedding IS NOT NULL" + doc_filter +
+                        " ORDER BY dist LIMIT 5", params):
+                    add(r["id"], r["text"], max(0.0, 1.0 - float(r["dist"])),
+                        r["doc_id"], r["doc_title"])
             except Exception:
                 pass
     try:
+        params = [query, subject_id, query] + ([doc_id] if doc_id is not None else [])
         for r in c.execute(
-                "SELECT id, text, ts_rank(fts, plainto_tsquery('simple', %s)) AS rank FROM chunks "
-                "WHERE subject_id=%s AND fts @@ plainto_tsquery('simple', %s) "
-                "ORDER BY rank DESC LIMIT 5", (query, subject_id, query)):
-            add(r["id"], r["text"], float(r["rank"]))
+                "SELECT ch.id, ch.text, ch.doc_id, d.title AS doc_title, "
+                "ts_rank(ch.fts, plainto_tsquery('simple', %s)) AS rank FROM chunks ch "
+                "JOIN docs d ON d.id=ch.doc_id "
+                "WHERE ch.subject_id=%s AND ch.fts @@ plainto_tsquery('simple', %s)" + doc_filter +
+                " ORDER BY rank DESC LIMIT 5", params):
+            add(r["id"], r["text"], float(r["rank"]), r["doc_id"], r["doc_title"])
     except Exception:
         pass
     if merged:
         return sorted(merged.values(), key=lambda x: -x["score"])[:k]
     # fallback TF-IDF trong Python (cap 500 chunk — ponytail ceiling)
-    rows = c.execute("SELECT id, text FROM chunks WHERE subject_id=%s ORDER BY ord LIMIT 500",
-                     (subject_id,)).fetchall()
-    return rag.tfidf_rank([dict(r) for r in rows], query, k=k)
+    params = [subject_id] + ([doc_id] if doc_id is not None else [])
+    rows = c.execute(
+        "SELECT ch.id, ch.text, ch.doc_id, d.title AS doc_title FROM chunks ch "
+        "JOIN docs d ON d.id=ch.doc_id WHERE ch.subject_id=%s" + doc_filter +
+        " ORDER BY ch.ord LIMIT 500", params).fetchall()
+    meta = {r["id"]: (r["doc_id"], r["doc_title"]) for r in rows}
+    out = rag.tfidf_rank([dict(r) for r in rows], query, k=k)
+    for h in out:
+        h["doc_id"], h["doc_title"] = meta[h["id"]]
+    return out

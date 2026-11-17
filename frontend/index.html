@@ -349,13 +349,20 @@
 
         <!-- PATH -->
         <section class="view" id="view-path">
-          <div class="view-head"><h2 id="pathTitle">Lộ trình — Sinh 12</h2><p id="pathSub">Chương 2: Quang hợp · 5 bài · mỗi bài 5 câu, khoảng 5 phút.</p></div>
+          <div class="view-head"><h2 id="pathTitle">Lộ trình — Sinh 12</h2><p id="pathSub">Chương 2: Quang hợp · 5 bài · mỗi bài 5 câu.</p></div>
           <div class="card" style="margin-bottom:16px">
             <label class="field" style="margin-bottom:0"><span class="label">CHỌN MÔN</span>
               <select class="input" id="pathSubject" onchange="renderPath()" style="margin-top:6px"></select>
             </label>
             <div class="chapter-bar" id="chapterBar" style="margin-top:12px"></div>
+            <div class="row-between" id="refreshRow" style="margin-top:12px" hidden>
+              <button class="btn btn-outline btn-sm" id="refreshPathBtn" onclick="refreshPath()">Cập nhật lộ trình từ tài liệu</button>
+              <span class="meta" id="pathMsg"></span>
+            </div>
+            <p class="meta" id="pathGapNote" style="margin-top:8px" hidden></p>
           </div>
+          <div id="outlinePanel"></div>
+          <div id="refreshPanel"></div>
           <div class="path-wrap" id="pathWrap"></div>
           <div style="height:16px"></div>
           <div style="text-align:center"><button class="btn btn-accent" onclick="startQuiz()">Bắt đầu bài tiếp theo</button></div>
@@ -381,7 +388,11 @@
 
         <!-- CHAT -->
         <section class="view" id="view-chat">
-          <div class="view-head"><h2>Hỏi đáp trên tài liệu</h2><p>Hỏi như dùng ChatGPT, nhưng TuHoc chỉ trả lời từ tài liệu bạn đã đẩy lên và trích đúng đoạn nguồn.</p></div>
+          <div class="view-head"><h2>Hỏi đáp trên tài liệu</h2><p>Chọn Tài liệu để chỉ trả lời từ tài liệu của bạn, Chung để hỏi kiến thức chung. Tự động thử tài liệu trước, không có mới trả lời chung.</p></div>
+          <div id="chatDocScope" class="scope-bar" hidden>
+            <span class="pill pill-green" id="chatDocScopeLabel"></span>
+            <button class="btn btn-ghost btn-sm" type="button" onclick="clearDocScope()">× Hỏi cả môn</button>
+          </div>
           <div class="chat-layout">
             <div class="chat-box">
               <div class="chat-log" id="chatLog" aria-live="polite"></div>
@@ -389,6 +400,14 @@
                 <button class="btn btn-outline" onclick="askSuggest('Quang hợp là gì?')">Quang hợp là gì?</button>
                 <button class="btn btn-outline" onclick="askSuggest('Pha sáng và pha tối khác nhau thế nào?')">Pha sáng và pha tối khác nhau thế nào?</button>
                 <button class="btn btn-outline" onclick="askSuggest('Cho ví dụ về quang hợp trong đời sống')">Cho ví dụ về quang hợp trong đời sống</button>
+              </div>
+              <div class="mode-row" role="group" aria-label="Chế độ trả lời">
+                <span class="label">CHẾ ĐỘ</span>
+                <div class="seg" id="chatModeSeg">
+                  <button type="button" data-mode="rag" aria-pressed="false" onclick="setChatMode('rag')">Tài liệu</button>
+                  <button type="button" data-mode="auto" aria-pressed="true" onclick="setChatMode('auto')">Tự động</button>
+                  <button type="button" data-mode="general" aria-pressed="false" onclick="setChatMode('general')">Chung</button>
+                </div>
               </div>
               <form class="chat-input" id="chatForm">
                 <input class="input" id="chatInput" placeholder="Hỏi từ tài liệu Sinh 12…" aria-label="Câu hỏi cho trợ lý" autocomplete="off">

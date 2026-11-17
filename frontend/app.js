@@ -1,7 +1,8 @@
 /* TuHoc RAG v2 — frontend logic.
    API contract v2 (FastAPI, prefix /api) — khong tu bia endpoint.
-   Neu backend chua chay: che do demo, banner ghi ro, du lieu mau trong file nay.
-   Token luu localStorage, gui kem Bearer. Khong bao gio hien key. */
+   Them: hybrid path (outline/refresh proposals) + chat 2 che do (rag/auto/general,
+   doc-scoped chat). Neu backend chua chay: che do demo, banner ghi ro, du lieu
+   mau trong file nay. Token luu localStorage, gui kem Bearer. Khong bao gio hien key. */
 "use strict";
 
 /* ---------- API client ---------- */
@@ -18,6 +19,15 @@ let role = localStorage.getItem("tuhoc_role") || "student";
 let userName = localStorage.getItem("tuhoc_name") || "Minh Anh";
 let demoMode = !token;           // chua dang nhap = demo
 let apiLive = false;
+let chatMode = "auto";       // che do chat cua mon dang chon: rag | auto | general
+let chatDocScope = null;     // {id, title} khi hoi trong 1 tai lieu cu the
+let panelSid = null;         // mon cua panel de xuat dang mo (doi mon thi xoa panel)
+let livePath = {};           // sid -> {chapters:[{n,title}], lessons:{chapterN:[lesson]}}
+let livePathLoading = {};    // sid -> true khi dang fetch lo trinh that
+let livePathError = {};      // sid -> true khi fetch lo trinh that loi
+let proposalLoadingSid = null; // sid dang GET de xuat cho duyet (chong goi lap)
+let proposalCheckedSid = null; // sid da kiem tra de xuat lan nay (reset khi doi mon)
+let pathSeq = 0;             // chong response cu khi doi mon nhanh
 
 async function api(path, opts) {
   const res = await fetch(API_BASE + "/api" + path, {
@@ -214,13 +224,16 @@ function go(view, arg) {
   if (view === "subjects") renderSubjects();
   if (view === "path") renderPath();
   if (view === "quiz") loadQuizQuestions();
-  if (view === "docs") renderDocs();
+  if (view === "docs") { renderDocs(); if (!demoMode) loadDocs(Number($("#docSubject").value || subjects[0].id)); }
   if (view === "teacher") renderTeacher();
   window.scrollTo({top: 0});
 }
 function enterApp() {
   showView("app");
   $("#app").classList.add("active");
+  /* B1: live mode khong bao gio hien tai lieu demo nhu that. Tai lieu cu
+     nap lai khi mo man Tai lieu (GET /api/subjects/{sid}/docs). */
+  if (!demoMode) docs = [];
   $("#sideUser").textContent = demoMode ? "Bạn đang dùng thử (demo)" : (userName + " · " + (role === "teacher" ? "Giáo viên" : "Học sinh"));
   renderAll();
   updateBanner();
@@ -229,6 +242,7 @@ function logout() {
   token = ""; role = "student";
   localStorage.removeItem("tuhoc_token"); localStorage.removeItem("tuhoc_role");
   demoMode = true; progress = {xp: 1240, xpToday: 10, gems: 86, hearts: 5, streak: 7, daily_goal: 30};
+  docs = DEMO_DOCS.slice();
   showView("landing");
   updateBanner();
 }
@@ -271,7 +285,10 @@ $("#authForm").addEventListener("submit", async (e) => {
     token = data.token; userName = name;
     localStorage.setItem("tuhoc_token", token);
     localStorage.setItem("tuhoc_name", name); localStorage.setItem("tuhoc_role", role);
-    demoMode = false; enterApp(); go("dashboard");
+    demoMode = false;
+    /* Dong bo tien do that ngay sau khi dang nhap (khong thi chip van hien so demo cu trong localStorage). */
+    try { const me = await api("/me"); progress = {...progress, xpToday: progress.xpToday, ...me}; saveProgress(); } catch (e3) {}
+    enterApp(); go("dashboard");
   } catch (e2) {
     err.textContent = apiLive
       ? "Không đăng nhập được: " + e2.message
@@ -331,7 +348,8 @@ function syncSubjectLabels() {
   const q = subjects.find((x) => x.id === Number(qid));
   if (q) $("#quizSub").textContent = q.name + " · Trả lời đúng cộng 10 XP, sai trừ 1 tim.";
   const cid = Number($("#chatSubject").value || subjects[0].id);
-  $("#chatInput").placeholder = "Hỏi từ tài liệu " + subjectName(cid) + "…";
+  chatMode = loadChatMode(cid);
+  syncChatModeUI();
   renderChatSuggests(cid);
 }
 function renderAll() {
@@ -397,19 +415,27 @@ $("#createSubjectForm").addEventListener("submit", async (e) => {
   const name = $("#newSubjectName").value.trim();
   if (!name) return;
   if (!demoMode) {
-    try { const s = await api("/subjects", {method: "POST", body: JSON.stringify({name})}); subjects.unshift({id: s.id, name: s.name, code: name.slice(0, 2), desc: "", progress: 0, lessons: "0/20 bài", custom: true}); }
-    catch (e2) { alert("Không tạo được môn: " + e2.message); return; }
+    try {
+      const s = await api("/subjects", {method: "POST", body: JSON.stringify({name})});
+      subjects.unshift({id: s.id, name: s.name, code: name.slice(0, 2), desc: "", progress: 0, lessons: "0/20 bài", custom: true});
+      $("#newSubjectName").value = ""; renderSubjects(); renderAll();
+      openSubject(s.id);
+      if (s.outline_proposal) showOutlinePanel(s.id, s.outline_proposal);
+    } catch (e2) { alert("Không tạo được môn: " + e2.message); return; }
   } else {
-    subjects.unshift({id: Date.now(), name, code: name.slice(0, 2), desc: "Môn tự tạo", progress: 0, lessons: "0/20 bài", custom: true});
+    const nid = Date.now();
+    subjects.unshift({id: nid, name, code: name.slice(0, 2), desc: "Môn tự tạo", progress: 0, lessons: "0/20 bài", custom: true});
+    $("#newSubjectName").value = ""; renderSubjects(); renderAll();
+    openSubject(nid);
+    showOutlinePanel(nid, demoOutlineProposal(name));
   }
-  $("#newSubjectName").value = ""; renderSubjects(); renderAll();
 });
 function openSubject(id) {
   const s = subjects.find((x) => x.id === id);
   if (!s) return;
   $("#pathSubject").value = String(id);
   $("#pathTitle").textContent = "Lộ trình — " + s.name;
-  go("path");
+  go("path"); /* renderPath() se nap de xuat dang cho duyet (neu co) */
 }
 
 /* ---------- Learning path ---------- */
@@ -418,27 +444,293 @@ function renderPath() {
   const sel = $("#pathSubject");
   const sid = Number(sel.value || subjects[0].id);
   const subj = subjects.find((s) => s.id === sid) || subjects[0];
+  if (panelSid !== null && panelSid !== sid) { clearPathPanels(); panelSid = null; proposalCheckedSid = null; }
   $("#pathTitle").textContent = "Lộ trình — " + subj.name;
+  const refreshRow = $("#refreshRow");
+  if (refreshRow) refreshRow.hidden = !docs.some((d) => d.subject === subj.name && d.status === "done");
+  /* M2: de xuat dang cho duyet phai hien lai ca khi vao Lo trinh bang nav/dropdown,
+     khong chi khi bam card mon. Chi kiem tra 1 lan moi luot vao mon. */
+  if (!demoMode && panelSid !== sid && proposalCheckedSid !== sid) { proposalCheckedSid = sid; loadPendingProposal(sid); }
   const content = demoMode ? demoContent(sid) : null;
-  const chapters = content ? content.chapters : ["Chương 1: Kiến thức nền tảng", "Chương 2: Kiến thức trọng tâm", "Chương 3: Ôn tập tổng hợp"];
+  /* H2: live mode chua co du lieu that thi hien dang tai / loi — khong dung bai
+     demo Sinh 12 lam cho truoc. */
+  if (!demoMode && !livePath[sid]) {
+    if (livePathError[sid]) {
+      $("#chapterBar").innerHTML = "";
+      $("#pathSub").textContent = "Chưa tải được lộ trình.";
+      $("#pathWrap").innerHTML = `<div class="empty"><h3>Không tải được lộ trình</h3><p>Kiểm tra mạng hoặc backend rồi thử lại.</p><button class="btn btn-accent" onclick="retryLivePath(${sid})">Thử lại</button></div>`;
+    } else {
+      $("#chapterBar").innerHTML = "";
+      $("#pathSub").textContent = "Đang tải lộ trình…";
+      $("#pathWrap").innerHTML = `<div class="empty"><h3>Đang tải lộ trình…</h3><p>TuHoc đang lấy chương và bài học thật của môn này.</p></div>`;
+      if (!livePathLoading[sid]) fetchLivePath(sid);
+    }
+    updateGapNote(null);
+    return;
+  }
+  let chapters;
+  if (content) chapters = content.chapters;
+  else if (!demoMode && livePath[sid] && livePath[sid].chapters) chapters = livePath[sid].chapters.map((c) => c.title);
+  else chapters = ["Chương 1: Kiến thức nền tảng", "Chương 2: Kiến thức trọng tâm", "Chương 3: Ôn tập tổng hợp"];
   if (currentChapter >= chapters.length) currentChapter = 0;
+  if (!chapters.length) {
+    $("#chapterBar").innerHTML = "";
+    $("#pathSub").textContent = "Môn này chưa có chương nào.";
+    $("#pathWrap").innerHTML = `<div class="empty"><h3>Môn này chưa có chương nào</h3><p>Tải tài liệu lên để TuHoc tạo lộ trình theo từng chương.</p><button class="btn btn-accent" onclick="go('docs')">Tải tài liệu lên</button></div>`;
+    updateGapNote(null);
+    return;
+  }
   $("#chapterBar").innerHTML = chapters.map((c, i) =>
     `<button class="btn btn-sm ${i === currentChapter ? "btn-primary" : "btn-outline"}" onclick="pickChapter(${i})">${esc(c)}</button>`).join("");
   if (demoMode && !content) {
     $("#pathSub").textContent = "Môn này chưa có bài học mẫu.";
     $("#pathWrap").innerHTML = `<div class="empty"><h3>Chưa có lộ trình cho ${esc(subj.name)}</h3><p>Tải tài liệu của môn lên, TuHoc sẽ tạo lộ trình theo từng chương.</p><button class="btn btn-accent" onclick="go('docs')">Tải tài liệu lên</button></div>`;
+    updateGapNote(null);
     return;
   }
-  const lessons = content ? content.lessons : DEMO_LESSONS;
-  $("#pathSub").textContent = chapters[currentChapter] + " · 5 bài · mỗi bài 5 câu, khoảng 5 phút.";
-  $("#pathWrap").innerHTML = lessons.map((l, i) => `
-    <div class="path-node ${i % 2 === 1 ? "flip" : ""}">
-      <span class="node-circle ${l.state}" aria-label="Bài ${l.n}: ${l.state === "done" ? "đã xong" : l.state === "current" ? "đang học" : "đang khóa"}">${l.state === "done" ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>' : l.state === "locked" ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>' : l.n}</span>
-      <div class="node-info"><b>${esc(l.title)}</b><span>${esc(l.note)}</span></div>
-      ${l.state !== "locked" ? `<button class="btn btn-sm ${l.state === "current" ? "btn-accent" : "btn-outline"}" onclick="startQuiz('${esc(l.title)}')">Học</button>` : ""}
-    </div>`).join("");
+  let lessons;
+  if (content) lessons = content.lessons;
+  else if (!demoMode && livePath[sid] && livePath[sid].lessons) {
+    const chN = livePath[sid].chapters ? livePath[sid].chapters[currentChapter].n : (currentChapter + 1);
+    lessons = livePath[sid].lessons[chN] || DEMO_LESSONS;
+  } else lessons = DEMO_LESSONS;
+  /* H1: so bai lay theo du lieu that, khong hardcode "5 bai"; bo "khoang 5 phut". */
+  $("#pathSub").textContent = chapters[currentChapter] + " · " + lessons.length + " bài · mỗi bài 5 câu.";
+  updateGapNote(!demoMode && livePath[sid] ? livePath[sid].chapters : null);
+  if (lessons.length === 0) {
+    /* M4: chuong trong thi hien empty state, khong de vung lo trinh trang tron. */
+    $("#pathWrap").innerHTML = `<div class="empty"><h3>Chương này chưa có bài học</h3><p>Tải tài liệu của chương lên để TuHoc tạo bài học và quiz.</p><button class="btn btn-accent" onclick="go('docs')">Tải tài liệu lên</button></div>`;
+  } else {
+    $("#pathWrap").innerHTML = lessons.map((l, i) => {
+      const src = l.source_doc_title || l.source_title || l.source;
+      return `
+      <div class="path-node ${i % 2 === 1 ? "flip" : ""}">
+        <span class="node-circle ${l.state}" aria-label="Bài ${l.n}: ${l.state === "done" ? "đã xong" : l.state === "current" ? "đang học" : "đang khóa"}">${l.state === "done" ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>' : l.state === "locked" ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>' : l.n}</span>
+        <div class="node-info"><b>${esc(l.title)}</b><span>${esc(l.note)}</span>${src ? `<span class="meta" style="display:block">Nguồn: ${esc(src)}</span>` : ""}</div>
+        ${l.state !== "locked" ? `<button class="btn btn-sm ${l.state === "current" ? "btn-accent" : "btn-outline"}" onclick="startQuiz('${esc(l.title)}')">Học</button>` : ""}
+      </div>`;
+    }).join("");
+  }
+  /* M7: chuong dang chon phai nhin thay tron ven tren man hep. */
+  const activeBtn = $("#chapterBar .btn-primary");
+  if (activeBtn) activeBtn.scrollIntoView({inline: "nearest", block: "nearest"});
 }
-function pickChapter(i) { currentChapter = i; renderPath(); }
+
+/* M5: ghi chu khi so chuong khong lien tuc sau khi duyet tung phan (vd. chi con Ch1, Ch3). */
+function updateGapNote(chapters) {
+  const el = $("#pathGapNote"); if (!el) return;
+  if (!chapters || chapters.length < 2) { el.hidden = true; return; }
+  const nums = chapters.map((c) => c.n).filter((n) => typeof n === "number").sort((a, b) => a - b);
+  if (nums.length !== chapters.length) { el.hidden = true; return; }
+  const missing = [];
+  for (let n = nums[0]; n <= nums[nums.length - 1]; n++) if (!nums.includes(n)) missing.push(n);
+  if (!missing.length) { el.hidden = true; return; }
+  el.textContent = "Chưa có " + missing.map((n) => "Chương " + n).join(", ") + " trong lộ trình (chưa được chọn).";
+  el.hidden = false;
+}
+
+function retryLivePath(sid) { delete livePathError[sid]; fetchLivePath(sid); }
+function pickChapter(i) {
+  currentChapter = i; renderPath();
+  if (!demoMode) {
+    const sid = Number($("#pathSubject").value || subjects[0].id);
+    const chs = livePath[sid] && livePath[sid].chapters;
+    if (chs && chs[i] && !(livePath[sid].lessons || {})[chs[i].n]) fetchLivePath(sid, chs[i].n);
+  }
+}
+/* Lo trinh that tu API (live mode): chuong + bai theo mon. Loi thi giu khung
+   mac dinh, khong bao gio de man hinh trang. */
+async function fetchLivePath(sid, chapterN) {
+  if (livePathLoading[sid]) return;
+  livePathLoading[sid] = true;
+  const seq = ++pathSeq;
+  try {
+    let chs = livePath[sid] && livePath[sid].chapters;
+    if (!chs) {
+      const data = await api(`/subjects/${sid}/chapters`);
+      if (seq !== pathSeq) return;
+      chs = Array.isArray(data) ? data : [];
+    }
+    if (!chs.length) { livePath[sid] = {chapters: [], lessons: {}}; delete livePathError[sid]; renderPath(); return; }
+    const n = chapterN || chs[Math.min(currentChapter, chs.length - 1)].n;
+    const ls = await api(`/subjects/${sid}/lessons?chapter=${n}`);
+    if (seq !== pathSeq) return;
+    delete livePathError[sid];
+    livePath[sid] = livePath[sid] || {};
+    livePath[sid].chapters = chs;
+    livePath[sid].lessons = livePath[sid].lessons || {};
+    livePath[sid].lessons[n] = Array.isArray(ls) ? ls : [];
+    renderPath();
+  } catch (e) { livePathError[sid] = true; renderPath(); }
+  finally { livePathLoading[sid] = false; }
+}
+function invalidateLivePath(sid) { delete livePath[sid]; delete livePathLoading[sid]; currentChapter = 0; }
+
+/* ---------- Hybrid path: de xuat lo trinh (outline / refresh) ---------- */
+function clearPathPanels() {
+  const o = $("#outlinePanel"), r = $("#refreshPanel"), m = $("#pathMsg");
+  if (o) o.innerHTML = ""; if (r) r.innerHTML = ""; if (m) m.textContent = "";
+}
+function clearRefreshPanel() { const r = $("#refreshPanel"); if (r) r.innerHTML = ""; }
+/* H3: title tu server/demo co the mang san tien to "Chuong N:"/"Bai N:" — strip
+   truoc khi ghep de khong lap ("Them Chuong 4: Chuong 4: ..."). */
+function stripChapterPrefix(t) { return String(t || "").replace(/^Chương\s*\d+\s*:\s*/, ""); }
+function stripLessonPrefix(t) { return String(t || "").replace(/^Bài\s*\d+\s*:\s*/, ""); }
+function changeTitle(c) {
+  switch (c.type) {
+    case "add_chapter": return "Thêm Chương " + (c.chapter_n ?? "") + ": " + stripChapterPrefix(c.title);
+    case "rename_chapter": return "Đổi tên Chương " + (c.chapter_n ?? "") + " thành “" + stripChapterPrefix(c.title) + "”";
+    case "remove_chapter": return "Xóa Chương " + (c.chapter_n ?? "") + (c.old_title ? ": “" + stripChapterPrefix(c.old_title) + "”" : "");
+    case "add_lesson": return "Thêm Bài " + (c.lesson_n ?? "") + " vào Chương " + (c.chapter_n ?? "") + ": " + stripLessonPrefix(c.title);
+    case "rename_lesson": return "Đổi tên Bài " + (c.lesson_n ?? "") + " (Chương " + (c.chapter_n ?? "") + ") thành “" + stripLessonPrefix(c.title) + "”";
+    default: return c.title || c.type;
+  }
+}
+function changeSub(c) {
+  const parts = [];
+  if ((c.type === "rename_chapter" || c.type === "rename_lesson") && c.old_title) parts.push("Tên cũ: “" + c.old_title + "”");
+  if (c.type === "remove_chapter") parts.push("Chương này và các bài trong đó sẽ bị xóa.");
+  if (c.type === "add_chapter" && c.lessons && c.lessons.length) parts.push("Gồm " + c.lessons.length + " bài: " + c.lessons.map((l) => l.title).join(" · "));
+  if (c.source_doc_id) {
+    const d = docs.find((x) => x.id === Number(c.source_doc_id));
+    parts.push(d ? "Từ tài liệu: “" + d.title + "”" : "Từ tài liệu của môn này");
+  }
+  return parts.join(" · ");
+}
+function demoOutlineProposal(name) {
+  return {id: "demo-outline", kind: "outline", status: "pending", changes: [
+    {id: "d1", type: "add_chapter", chapter_n: 1, title: "Chương 1: Nền tảng " + name, lessons: [{n: 1, title: "Bài 1: Khái niệm cơ bản"}, {n: 2, title: "Bài 2: Thuật ngữ cần nhớ"}]},
+    {id: "d2", type: "add_chapter", chapter_n: 2, title: "Chương 2: Nội dung trọng tâm", lessons: [{n: 1, title: "Bài 1: Kiến thức cốt lõi"}, {n: 2, title: "Bài 2: Ví dụ và bài tập"}]},
+    {id: "d3", type: "add_chapter", chapter_n: 3, title: "Chương 3: Ôn tập tổng hợp", lessons: [{n: 1, title: "Bài 1: Ôn tập"}, {n: 2, title: "Bài 2: Kiểm tra cuối chương"}]},
+  ]};
+}
+function demoRefreshProposal() {
+  return {id: "demo-refresh", kind: "refresh", status: "pending", changes: [
+    {id: "r1", type: "add_chapter", chapter_n: 4, title: "Chương 4: Ôn tập tổng hợp", lessons: [{n: 1, title: "Bài 1: Ôn tập chương 2"}], source_doc_id: 1},
+    {id: "r2", type: "rename_lesson", chapter_n: 2, lesson_n: 2, title: "Bài 2: Pha sáng — giai đoạn tạo ATP", old_title: "Bài 2: Pha sáng"},
+  ]};
+}
+function showOutlinePanel(sid, proposal) {
+  const box = $("#outlinePanel"); if (!box) return;
+  /* Guard: de xuat nay dang hien thi khong render lai — giu nguyen checkbox
+     user da tick khi GET proposal goi tu renderPath ve sau panel tao mon. */
+  if (panelSid === sid && box.dataset.pid === String(proposal.id) && box.innerHTML) return;
+  panelSid = sid;
+  box.dataset.pid = proposal.id; box.dataset.sid = String(sid);
+  const changes = proposal.changes || [];
+  const rows = changes.map((c) => `
+    <label class="prop-row"><input type="checkbox" data-change="${esc(c.id)}" checked>
+      <span class="grow"><span class="title">${esc(changeTitle(c))}</span>
+      <span class="sub2">${esc(changeSub(c))}</span></span></label>`).join("");
+  box.innerHTML = `<div class="card proposal">
+    <div class="prop-head"><h3>Lộ trình gợi ý từ AI</h3><span class="pill pill-amber">Bản gợi ý — chưa duyệt</span></div>
+    <p class="prop-note">AI đã đọc tên môn và gợi ý dàn ý dưới đây. Chọn chương muốn dùng rồi bấm áp dụng, hoặc giữ khung mặc định.${demoMode ? " (Dữ liệu mẫu — demo, không gọi AI thật.)" : ""}</p>
+    <div class="prop-list">${rows || `<p class="meta">Không có chương gợi ý nào.</p>`}</div>
+    <div class="prop-actions">
+      <button class="btn btn-accent" onclick="applyOutline(true)">Dùng các chương đã chọn</button>
+      <button class="btn btn-outline" onclick="applyOutline(false)">Giữ khung mặc định</button>
+    </div>
+    <p class="meta" id="outlineMsg" style="margin-top:8px"></p>
+  </div>`;
+}
+async function loadPendingProposal(sid) {
+  if (demoMode || proposalLoadingSid === sid) return;
+  proposalLoadingSid = sid;
+  try {
+    const d = await api(`/subjects/${sid}/path/proposal`);
+    const p = d && d.proposal;
+    if (p && p.status !== "applied" && p.status !== "rejected" && Array.isArray(p.changes) && p.changes.length) showOutlinePanel(sid, p);
+  } catch (e) { /* khong co de xuat cho duyet — an panel */ }
+  finally { proposalLoadingSid = null; }
+}
+async function applyOutline(useSelected) {
+  const box = $("#outlinePanel"); if (!box || !box.dataset.pid) return;
+  const pid = box.dataset.pid, sid = Number(box.dataset.sid);
+  const ids = useSelected ? $$("#outlinePanel input[type=checkbox]:checked").map((cb) => cb.dataset.change) : [];
+  if (demoMode) {
+    box.innerHTML = `<div class="card proposal"><p>${useSelected ? "Demo: đã áp dụng " + ids.length + " chương (mẫu). Lộ trình vẫn dùng dữ liệu mẫu." : "Demo: đã giữ khung mặc định (mẫu)."}</p><div class="prop-actions"><button class="btn btn-outline" onclick="clearPathPanels()">Đóng</button></div></div>`;
+    return;
+  }
+  const msg = $("#outlineMsg");
+  try {
+    const r = await api(`/subjects/${sid}/path/proposals/${pid}/apply`, {method: "POST", body: JSON.stringify({change_ids: ids})});
+    invalidateLivePath(sid);
+    const done = (r.proposal_status === "rejected" || ids.length === 0)
+      ? "Đã giữ khung mặc định."
+      : "Đã áp dụng " + (r.applied ? r.applied.length : ids.length) + " chương vào lộ trình.";
+    box.innerHTML = `<div class="card proposal"><p>${esc(done)}</p><div class="prop-actions"><button class="btn btn-outline" onclick="clearPathPanels()">Đóng</button></div></div>`;
+    fetchLivePath(sid);
+  } catch (e2) { if (msg) msg.textContent = "Áp dụng thất bại: " + e2.message; }
+}
+async function refreshPath() {
+  const sid = Number($("#pathSubject").value || subjects[0].id);
+  const box = $("#refreshPanel"); if (!box) return;
+  const btn = $("#refreshPathBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Đang đọc tài liệu…"; }
+  if (demoMode) {
+    setTimeout(() => {
+      if (btn) { btn.disabled = false; btn.textContent = "Cập nhật lộ trình từ tài liệu"; }
+      showRefreshPanel(sid, demoRefreshProposal());
+    }, 600);
+    return;
+  }
+  try {
+    const d = await api(`/subjects/${sid}/path/refresh`, {method: "POST", body: JSON.stringify({})});
+    if (btn) { btn.disabled = false; btn.textContent = "Cập nhật lộ trình từ tài liệu"; }
+    if (d && d.proposal) showRefreshPanel(sid, d.proposal);
+    else box.innerHTML = `<div class="error-box"><p>Không nhận được đề xuất cập nhật. Thử lại sau.</p></div>`;
+  } catch (e2) {
+    if (btn) { btn.disabled = false; btn.textContent = "Cập nhật lộ trình từ tài liệu"; }
+    box.innerHTML = `<div class="error-box"><p>Không cập nhật được lộ trình: ${esc(e2.message)}</p></div>`;
+  }
+}
+function showRefreshPanel(sid, proposal) {
+  panelSid = sid;
+  const box = $("#refreshPanel"); if (!box) return;
+  box.dataset.pid = proposal.id; box.dataset.sid = String(sid);
+  const changes = proposal.changes || [];
+  /* Refresh tra changes: [] nghia la lo trinh da khop voi tai lieu — day la
+     ket qua binh thuong, khong phai loi, khong hien panel de xuat trong. */
+  if (!changes.length) {
+    box.innerHTML = `<div class="card proposal">
+      <div class="prop-head"><h3>Đề xuất cập nhật lộ trình</h3><span class="pill pill-green">Đã khớp</span></div>
+      <p class="prop-note">Lộ trình đã khớp với tài liệu, không có thay đổi nào.${demoMode ? " (Dữ liệu mẫu — demo.)" : ""}</p>
+      <div class="prop-actions"><button class="btn btn-outline" onclick="clearRefreshPanel()">Đóng</button></div>
+    </div>`;
+    return;
+  }
+  const rows = changes.map((c) => `
+    <label class="prop-row${c.type === "remove_chapter" ? " remove" : ""}"><input type="checkbox" data-change="${esc(c.id)}" checked>
+      <span class="grow"><span class="title">${esc(changeTitle(c))}</span>
+      <span class="sub2">${esc(changeSub(c))}</span></span></label>`).join("");
+  box.innerHTML = `<div class="card proposal">
+    <div class="prop-head"><h3>Đề xuất cập nhật lộ trình</h3><span class="pill pill-amber">Chưa duyệt</span></div>
+    <p class="prop-note">AI đã đọc tài liệu của môn và đề xuất các thay đổi dưới đây. Chỉ những mục được tick mới áp dụng.${demoMode ? " (Dữ liệu mẫu — demo.)" : ""}</p>
+    <div class="prop-list">${rows}</div>
+    <div class="prop-actions">
+      <button class="btn btn-accent" onclick="applyRefresh()">Áp dụng các mục đã chọn</button>
+      <button class="btn btn-ghost" onclick="clearRefreshPanel()">Bỏ qua</button>
+    </div>
+    <p class="meta" id="refreshMsg" style="margin-top:8px"></p>
+  </div>`;
+}
+async function applyRefresh() {
+  const box = $("#refreshPanel"); if (!box || !box.dataset.pid) return;
+  const pid = box.dataset.pid, sid = Number(box.dataset.sid);
+  const ids = $$("#refreshPanel input[type=checkbox]:checked").map((cb) => cb.dataset.change);
+  if (demoMode) {
+    box.innerHTML = `<div class="card proposal"><p>Demo: đã áp dụng ${ids.length} mục (mẫu). Lộ trình vẫn dùng dữ liệu mẫu.</p><div class="prop-actions"><button class="btn btn-outline" onclick="clearRefreshPanel()">Đóng</button></div></div>`;
+    return;
+  }
+  try {
+    const r = await api(`/subjects/${sid}/path/proposals/${pid}/apply`, {method: "POST", body: JSON.stringify({change_ids: ids})});
+    invalidateLivePath(sid);
+    box.innerHTML = `<div class="card proposal"><p>Đã áp dụng ${r.applied ? r.applied.length : ids.length} mục vào lộ trình.</p><div class="prop-actions"><button class="btn btn-outline" onclick="clearRefreshPanel()">Đóng</button></div></div>`;
+    fetchLivePath(sid);
+  } catch (e2) {
+    const m = $("#refreshMsg"); if (m) m.textContent = "Áp dụng thất bại: " + e2.message;
+  }
+}
 let currentLessonTitle = "";
 function startQuiz(lessonTitle) {
   currentLessonTitle = lessonTitle || "";
@@ -603,25 +895,88 @@ function showQuizDone() {
 }
 
 /* ---------- Chat RAG ---------- */
-function chatMsg(role2, text, sources) {
+/* Badge nguon cau tra loi: moi cau tra loi phai ghi ro no den tu dau, khong
+   de user nham cau tra loi chung la tu tai lieu. */
+const CHAT_BADGES = {
+  rag_llm: ["pill-green", "Từ tài liệu"],
+  auto_rag: ["pill-green", "Từ tài liệu"],
+  retrieval_only: ["pill-green", "Từ tài liệu"],
+  general: ["pill-blue", "Kiến thức chung"],
+  auto_general: ["pill-amber", "Không có trong tài liệu — trả lời chung"],
+  no_context: ["pill-amber", "Chưa có tài liệu khớp"],
+  general_unavailable: ["pill-red", "Kiến thức chung chưa dùng được"],
+  demo_rag: ["pill-grey", "Từ tài liệu · Demo"],
+  demo_general: ["pill-grey", "Kiến thức chung · Demo"],
+};
+function chatMsg(role2, text, sources, modeKey) {
   const log = $("#chatLog");
   const div = document.createElement("div");
   div.className = "msg " + role2;
-  div.innerHTML = esc(text) + (sources && sources.length ? `<details class="srcs"><summary>Nguồn trích dẫn (${sources.length})</summary>${sources.map((s) => `<p style="margin-top:6px">• ${esc(typeof s === "string" ? s : (s.text || ""))}</p>`).join("")}</details>` : "");
+  let badgeHtml = "";
+  if (role2 === "bot" && modeKey) {
+    /* M6: mode la tu server tra ve — neu co key moi thi van phai co badge. */
+    const b = CHAT_BADGES[modeKey] || ["pill-grey", "Chưa rõ nguồn"];
+    if (!CHAT_BADGES[modeKey]) console.warn("TuHoc: mode tra loi la '" + modeKey + "', chua co badge tuong ung.");
+    badgeHtml = `<div class="badge-row"><span class="pill ${b[0]}">${esc(b[1])}</span></div>`;
+  }
+  const srcHtml = (sources && sources.length ? `<details class="srcs"><summary>Nguồn trích dẫn (${sources.length})</summary>${sources.map((s) => {
+    if (typeof s === "string") return `<p style="margin-top:6px">• ${esc(s)}</p>`;
+    return `<p style="margin-top:6px">• ${esc(s.text || "")}${s.doc_title ? ` <span class="meta">(Nguồn: ${esc(s.doc_title)})</span>` : ""}</p>`;
+  }).join("")}</details>` : "");
+  div.innerHTML = badgeHtml + esc(text) + srcHtml;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
 function askSuggest(q) { $("#chatInput").value = q; $("#chatForm").requestSubmit(); }
-function setChatBusy(busy) {
+function setChatBusy(busy, label) {
   $("#chatInput").disabled = busy;
   $("#chatForm button[type=submit]").disabled = busy;
   let t = $("#typingMsg");
   if (busy && !t) {
     const log = $("#chatLog");
     t = document.createElement("div");
-    t.className = "msg bot"; t.id = "typingMsg"; t.textContent = "Đang tìm trong tài liệu…";
+    t.className = "msg bot"; t.id = "typingMsg"; t.textContent = label || "Đang tìm trong tài liệu…";
     log.appendChild(t); log.scrollTop = log.scrollHeight;
   } else if (!busy && t) { t.remove(); }
+}
+/* Che do chat, luu theo mon (mac dinh: auto). */
+function currentChatSid() { return Number($("#chatSubject").value || subjects[0].id); }
+function loadChatMode(sid) {
+  try { const m = JSON.parse(localStorage.getItem("tuhoc_chatmode") || "{}"); return (m && m[sid]) || "auto"; } catch (e) { return "auto"; }
+}
+function saveChatMode(sid, mode) {
+  try { const m = JSON.parse(localStorage.getItem("tuhoc_chatmode") || "{}"); m[sid] = mode; localStorage.setItem("tuhoc_chatmode", JSON.stringify(m)); } catch (e) {}
+}
+function syncChatModeUI() {
+  const seg = $("#chatModeSeg"); if (!seg) return;
+  seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === chatMode)));
+  updateChatPlaceholder();
+}
+function updateChatPlaceholder() {
+  const input = $("#chatInput"); if (!input) return;
+  input.placeholder = chatMode === "general" ? "Hỏi kiến thức chung…" : "Hỏi từ tài liệu " + subjectName(currentChatSid()) + "…";
+}
+function setChatMode(mode) {
+  if (!["rag", "auto", "general"].includes(mode)) mode = "auto";
+  chatMode = mode;
+  saveChatMode(currentChatSid(), mode);
+  syncChatModeUI();
+}
+/* Hoi trong 1 tai lieu cu the: chip hien ten tai lieu, gui kem doc_id. */
+function askInDoc(id) {
+  const d = docs.find((x) => x.id === Number(id));
+  if (!d) return;
+  const s = subjects.find((x) => x.name === d.subject);
+  if (s) { $("#chatSubject").value = String(s.id); syncSubjectLabels(); renderChatDocs(); }
+  chatDocScope = {id: d.id, title: d.title};
+  renderDocScope();
+  go("chat");
+}
+function clearDocScope() { chatDocScope = null; renderDocScope(); }
+function renderDocScope() {
+  const bar = $("#chatDocScope"); if (!bar) return;
+  bar.hidden = !chatDocScope;
+  if (chatDocScope) $("#chatDocScopeLabel").textContent = "Đang hỏi trong: " + chatDocScope.title;
 }
 $("#chatForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -630,20 +985,29 @@ $("#chatForm").addEventListener("submit", async (e) => {
   $("#chatInput").value = "";
   chatMsg("user", q);
   const sid = Number($("#chatSubject").value || subjects[0].id);
-  setChatBusy(true);
+  const mode = chatMode;
+  setChatBusy(true, mode === "general" ? "Đang trả lời…" : "Đang tìm trong tài liệu…");
   if (demoMode) {
     setTimeout(() => {
-      const a = demoChatAnswer(sid, q);
       setChatBusy(false);
-      chatMsg("bot", a.answer, a.sources);
+      /* M3: demo khong loc theo tai lieu — noi ro ngay trong cau tra loi. */
+      const scopeNote = chatDocScope ? "Demo: chưa lọc riêng theo tài liệu “" + chatDocScope.title + "” — đây là câu trả lời mẫu từ tài liệu của môn. Đăng nhập để hỏi trong 1 tài liệu cụ thể.\n\n" : "";
+      if (mode === "general") {
+        chatMsg("bot", scopeNote + "Demo: chế độ Chung sẽ trả lời bằng kiến thức chung khi có backend. Bản demo chỉ có câu trả lời mẫu từ tài liệu.", [], "demo_general");
+      } else {
+        const a = demoChatAnswer(sid, q);
+        chatMsg("bot", scopeNote + a.answer, a.sources, "demo_rag");
+      }
       gainXp(5);
     }, 500);
     return;
   }
   try {
-    const r = await api(`/subjects/${sid}/chat`, {method: "POST", body: JSON.stringify({question: q})});
+    const body = {question: q, mode};
+    if (chatDocScope) body.doc_id = chatDocScope.id;
+    const r = await api(`/subjects/${sid}/chat`, {method: "POST", body: JSON.stringify(body)});
     setChatBusy(false);
-    chatMsg("bot", r.answer, r.sources);
+    chatMsg("bot", r.answer, r.sources, r.mode);
     // H7: server giu tong XP; client chi cong bo dem xpToday cua phien, dung 1 lan.
     progress.xpToday = (progress.xpToday || 0) + 5;
     try { const me = await api("/me"); progress = {...progress, xpToday: progress.xpToday, ...me}; } catch (e3) {}
@@ -657,7 +1021,7 @@ function renderChatDocs() {
   const sid = Number($("#chatSubject").value || subjects[0].id);
   const subjName = subjectName(sid);
   $("#chatDocs").innerHTML = docs.filter((d) => d.subject === subjName && d.status === "done").map((d) =>
-    `<p style="font-size:14px;margin-bottom:8px">• ${esc(d.title)} <span class="meta">(${d.chunks} đoạn)</span></p>`).join("")
+    `<p style="font-size:14px;margin-bottom:8px">• ${esc(d.title)} <span class="meta">(${d.chunks} đoạn)</span><br><button class="btn btn-ghost btn-sm" type="button" onclick="askInDoc(${d.id})">Hỏi trong tài liệu này</button></p>`).join("")
     || `<p class="meta">Chưa có tài liệu trong môn này.</p>`;
 }
 async function uploadFromChat() {
@@ -674,7 +1038,10 @@ async function uploadFromChat() {
   const fd = new FormData(); fd.append("file", f);
   try {
     const r = await apiForm(`/subjects/${sid}/docs`, fd);
-    docs.unshift({id: Date.now(), title: f.name, subject: subjectName(sid), status: "indexing", chunks: 0, size: (f.size / 1048576).toFixed(1) + " MB"});
+    /* Giu id that tu server (khong dung Date.now) de hoi trong tai lieu nay gui dung doc_id.
+       Lay luon status/chunks server tra (index dong bo) — neu de "indexing" mai thi
+       nut "Cap nhat lo trinh tu tai lieu" khong bao gio hien o live mode. */
+    docs.unshift({id: (r && r.id) || Date.now(), title: f.name, subject: subjectName(sid), status: (r && r.status) || "indexing", chunks: (r && r.chunks) || 0, size: (f.size / 1048576).toFixed(1) + " MB"});
     renderDocs();
     msg.textContent = "Đã tải lên. Trạng thái: " + (r.status || "đang lập chỉ mục") + ".";
   }
@@ -682,6 +1049,22 @@ async function uploadFromChat() {
 }
 
 /* ---------- Docs ---------- */
+/* Nap tai lieu cu cua 1 mon o live mode (GET /api/subjects/{sid}/docs).
+   Chi thay the tai lieu cua mon do trong danh sach, giu tai lieu mon khac
+   va tai lieu vua up trong phien. Loi -> giu danh sach hien co, bao nhe. */
+async function loadDocs(sid) {
+  if (demoMode) return;
+  try {
+    const rows = await api(`/subjects/${sid}/docs`);
+    const name = subjectName(sid);
+    docs = docs.filter((d) => d.subject !== name).concat(
+      rows.map((r) => ({id: r.id, title: r.title, subject: name, status: r.status, chunks: r.chunks})));
+    renderDocs();
+  } catch (e2) {
+    const m = $("#docMsg");
+    if (m) m.textContent = "Không tải được danh sách tài liệu: " + e2.message;
+  }
+}
 function statusPill(s) {
   if (s === "done") return `<span class="pill pill-green"><span class="dot"></span>Đã xong</span>`;
   if (s === "indexing") return `<span class="pill pill-amber"><span class="dot"></span>Đang lập chỉ mục</span>`;
@@ -694,7 +1077,7 @@ function renderDocs() {
     <td><b>${esc(d.title)}</b><br><span class="meta">${esc(d.size || "")}</span></td>
     <td>${esc(d.subject)}</td><td>${statusPill(d.status)}</td>
     <td class="num">${d.status === "done" ? d.chunks : "—"}</td>
-    <td style="text-align:right">${d.status === "error" ? `<button class="btn btn-outline btn-sm" onclick="retryDoc(${d.id})">Thử lại</button> ` : ""}<button class="btn btn-ghost btn-sm" onclick="deleteDoc(${d.id})">Xóa tài liệu</button></td>
+    <td style="text-align:right">${d.status === "done" ? `<button class="btn btn-outline btn-sm" onclick="askInDoc(${d.id})">Hỏi trong tài liệu này</button> ` : ""}${d.status === "error" ? `<button class="btn btn-outline btn-sm" onclick="retryDoc(${d.id})">Thử lại</button> ` : ""}<button class="btn btn-ghost btn-sm" onclick="deleteDoc(${d.id})">Xóa tài liệu</button></td>
   </tr>`).join("");
   renderChatDocs();
 }
@@ -737,12 +1120,18 @@ $("#docForm").addEventListener("submit", async (e) => {
   }
   try {
     const sidVal = $("#docSubject").value;
-    if (file) { const fd = new FormData(); fd.append("file", file); await apiForm(`/subjects/${sidVal}/docs`, fd); }
-    else { await api(`/subjects/${sidVal}/docs`, {method: "POST", body: JSON.stringify({title, text})}); }
-    docs.unshift({id: Date.now(), title, subject: subjectName(sidVal), status: "indexing", chunks: 0, size: file ? (file.size / 1048576).toFixed(1) + " MB" : "văn bản dán"});
+    let r = null;
+    if (file) { const fd = new FormData(); fd.append("file", file); r = await apiForm(`/subjects/${sidVal}/docs`, fd); }
+    else { r = await api(`/subjects/${sidVal}/docs`, {method: "POST", body: JSON.stringify({title, text})}); }
+    docs.unshift({id: (r && r.id) || Date.now(), title, subject: subjectName(sidVal), status: (r && r.status) || "indexing", chunks: (r && r.chunks) || 0, size: file ? (file.size / 1048576).toFixed(1) + " MB" : "văn bản dán"});
     renderDocs();
     msg.textContent = "Đã tải lên, đang lập chỉ mục.";
   } catch (e2) { msg.textContent = "Tải lên thất bại: " + e2.message; }
+});
+/* Doi mon o man Tai lieu (live mode) -> nap tai lieu cua mon do. */
+$("#docSubject").addEventListener("change", () => {
+  if (!demoMode && $("#view-docs").classList.contains("active"))
+    loadDocs(Number($("#docSubject").value));
 });
 
 /* ---------- Essay ---------- */
@@ -905,7 +1294,7 @@ wireFileName("#docFile", "#docFileName");
 /* ---------- Doi mon o cac select phai doi noi dung ngay (khong cho toi khi chuyen man hinh) ---------- */
 $("#pathSubject").addEventListener("change", renderPath);
 $("#quizSubject").addEventListener("change", loadQuizQuestions);
-$("#chatSubject").addEventListener("change", () => { syncSubjectLabels(); renderChatDocs(); });
+$("#chatSubject").addEventListener("change", () => { clearDocScope(); syncSubjectLabels(); renderChatDocs(); });
 
 /* ---------- Entrance (IntersectionObserver) ----------
    Noi dung hien mac dinh; chi khi trinh duyet ho tro IO va user khong giam
@@ -935,7 +1324,7 @@ function observeReveals(root) {
   if (!demoMode) { await loadSubjectsFromApi(); try { const me = await api("/me"); progress = {...progress, ...me}; } catch (e) {} }
   if (token) { enterApp(); go("dashboard"); }
   else {
-    chatMsg("bot", "Chào bạn, mình là trợ lý học tập của TuHoc. Chọn một môn ở khung bên phải rồi hỏi mình bất cứ gì trong tài liệu của môn đó nhé.", []);
+    chatMsg("bot", "Chào bạn, mình là trợ lý học tập của TuHoc. Chọn một môn ở mục Tải tài liệu nhanh rồi hỏi mình bất cứ gì trong tài liệu của môn đó nhé.", []);
     renderAll();
   }
   renderProgress();
