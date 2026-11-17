@@ -44,7 +44,24 @@ async function checkHealth() {
   try { const h = await api("/health"); apiLive = !!h.ok; }
   catch (e) { apiLive = false; }
   demoMode = !apiLive || !token;
-  $("#demoBanner").hidden = !demoMode;
+  updateBanner();
+}
+/* Banner tach 2 trang thai: backend chua chay va chua dang nhap la 2 nguyen
+   nhan khac nhau, khong dung 1 cau cho ca hai. */
+function updateBanner() {
+  const b = $("#demoBanner");
+  if (!b) return;
+  if (!apiLive) {
+    b.hidden = false;
+    b.className = "banner";
+    b.innerHTML = "<b>Backend chưa chạy.</b> Bạn đang xem dữ liệu mẫu. Kiểm tra server rồi đăng nhập để dùng dữ liệu thật của bạn.";
+  } else if (!token) {
+    b.hidden = false;
+    b.className = "banner banner-info";
+    b.innerHTML = "<b>Bạn chưa đăng nhập.</b> Đây là dữ liệu mẫu. Đăng nhập để học với tài liệu và tiến độ thật của bạn.";
+  } else {
+    b.hidden = true;
+  }
 }
 
 /* ---------- Demo data (ghi ro la mau) ---------- */
@@ -206,16 +223,20 @@ function enterApp() {
   $("#app").classList.add("active");
   $("#sideUser").textContent = demoMode ? "Bạn đang dùng thử (demo)" : (userName + " · " + (role === "teacher" ? "Giáo viên" : "Học sinh"));
   renderAll();
+  updateBanner();
 }
 function logout() {
   token = ""; role = "student";
   localStorage.removeItem("tuhoc_token"); localStorage.removeItem("tuhoc_role");
   demoMode = true; progress = {xp: 1240, xpToday: 10, gems: 86, hearts: 5, streak: 7, daily_goal: 30};
   showView("landing");
+  updateBanner();
 }
 $$("[data-goto]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.goto)));
 $("#demoBtn").addEventListener("click", () => { demoMode = true; enterApp(); go("dashboard"); });
 $("#demoBtn2").addEventListener("click", () => { demoMode = true; enterApp(); go("dashboard"); });
+const demoBtn3 = $("#demoBtn3");
+if (demoBtn3) demoBtn3.addEventListener("click", () => { demoMode = true; enterApp(); go("dashboard"); });
 
 /* ---------- Auth ---------- */
 let authMode = "login";
@@ -241,6 +262,8 @@ $("#authForm").addEventListener("submit", async (e) => {
   const err = $("#authError");
   err.hidden = true;
   if (password.length < 6) { err.textContent = "Mật khẩu cần tối thiểu 6 ký tự."; err.hidden = false; return; }
+  const btn = $("#authSubmit");
+  btn.disabled = true; btn.textContent = "Đang đăng nhập…";
   try {
     const path = authMode === "login" ? "/auth/login" : "/auth/register";
     const body = authMode === "login" ? {email, password} : {name, email, password, role};
@@ -255,15 +278,22 @@ $("#authForm").addEventListener("submit", async (e) => {
       : "Backend chưa chạy nên không đăng nhập được. Bạn có thể bấm “Dùng thử không cần đăng nhập” để xem giao diện demo.";
     err.hidden = false;
   }
+  btn.disabled = false; btn.textContent = authMode === "login" ? "Đăng nhập" : "Tạo tài khoản";
 });
 
 /* ---------- Shared renders ---------- */
+let lastXpShown = null, lastHeartsShown = null;
 function renderProgress() {
   saveProgress();
   $("#chipStreak").textContent = progress.streak;
   $("#chipXp").textContent = progress.xp.toLocaleString("vi-VN");
   $("#chipHearts").textContent = progress.hearts;
   $("#chipGems").textContent = progress.gems;
+  /* Bump chip khi XP tang hoac tim giam: feedback nhin thay duoc, 240ms. */
+  const cx = $("#chipXp"), ch = $("#chipHearts");
+  if (lastXpShown !== null && progress.xp > lastXpShown && cx) { cx.classList.remove("bump"); void cx.offsetWidth; cx.classList.add("bump"); }
+  if (lastHeartsShown !== null && progress.hearts < lastHeartsShown && ch) { ch.classList.remove("bump"); void ch.offsetWidth; ch.classList.add("bump"); }
+  lastXpShown = progress.xp; lastHeartsShown = progress.hearts;
   const k = $("#kpiXp"); if (k) k.textContent = (progress.xpToday || 0) + " / " + progress.daily_goal;
   const kd = $("#kpiXpDelta");
   if (kd) { const left = Math.max(0, progress.daily_goal - (progress.xpToday || 0)); kd.textContent = left > 0 ? ("Còn " + left + " XP tới mục tiêu") : "Đã đạt mục tiêu ngày"; }
@@ -292,7 +322,9 @@ function renderChatSuggests(sid) {
   if (!box) return;
   const list = DEMO_SUGGESTS[sid];
   if (!list) { box.innerHTML = ""; return; }
-  box.innerHTML = list.map((q) => `<button class="btn btn-outline" onclick="askSuggest('${q.replace(/'/g, "\'")}')">${esc(q)}</button>`).join("");
+  /* data-q + listener thay vi noi chuoi vao onclick (apostrophe thang se vo onclick). */
+  box.innerHTML = list.map((q) => `<button type="button" class="btn btn-outline" data-q="${esc(q)}">${esc(q)}</button>`).join("");
+  box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => askSuggest(b.dataset.q)));
 }
 function syncSubjectLabels() {
   const qid = $("#quizSubject").value || subjects[0].id;
@@ -304,7 +336,7 @@ function syncSubjectLabels() {
 }
 function renderAll() {
   renderProgress();
-  renderSubjects(); renderPath(); renderDocs(); renderTeacher(); renderDue();
+  renderSubjects(); renderLandingSubjects(); renderPath(); renderDocs(); renderTeacher(); renderDue();
   subjectOptions("#quizSubject", subjects); subjectOptions("#chatSubject", subjects);
   subjectOptions("#docSubject", subjects); subjectOptions("#essaySubject", subjects);
   subjectOptions("#pathSubject", subjects);
@@ -320,7 +352,7 @@ function renderAll() {
 }
 function renderDue() {
   $("#dueList").innerHTML = DEMO_DUE.map((d) => `
-    <div class="list-row"><span>●</span><div class="grow"><p class="title" style="font-weight:500">${esc(d.q)}</p><p class="sub2">${esc(d.tag)}</p></div></div>`).join("");
+    <div class="list-row"><span class="dot"></span><div class="grow"><p class="title" style="font-weight:500">${esc(d.q)}</p><p class="sub2">${esc(d.tag)}</p></div></div>`).join("");
 }
 
 /* ---------- Subjects ---------- */
@@ -328,9 +360,9 @@ function renderSubjects() {
   const grid = $("#subjectGrid");
   $("#subjectEmpty").hidden = subjects.length > 0;
   grid.innerHTML = subjects.map((s) => `
-    <div class="subject-card" role="button" tabindex="0" onclick="openSubject(${s.id})" onkeydown="if(event.key==='Enter')openSubject(${s.id})">
-      <span class="subj-ic">${esc(s.code || s.name.slice(0, 2))}</span><h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p>
-      <div class="progress-track"><div class="progress-fill" style="width:${s.progress}%"></div></div>
+    <div class="subject-card" role="button" tabindex="0" onclick="openSubject(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSubject(${s.id})}">
+      <span class="subj-ic subj-${subjColor(s)}">${esc(s.code || s.name.slice(0, 2))}</span><h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p>
+      <div class="progress-track"><div class="progress-fill fill-${subjColor(s)}" style="width:${s.progress}%"></div></div>
       <div class="row" style="margin-top:8px"><span>${esc(s.lessons)}</span><span class="num">${s.progress}% xong</span></div>
       ${s.custom ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="event.stopPropagation();deleteSubject(${s.id})">Xóa môn này</button>` : ""}
     </div>`).join("");
@@ -343,6 +375,20 @@ function deleteSubject(id) {
   renderSubjects(); renderAll();
 }
 function loadDemoSubjects() { subjects = DEMO_SUBJECTS.slice(); renderSubjects(); }
+/* Mau mon: map theo id seed 1-10; mon tu tao hoac tu API co id khac thi xoay vong theo id. */
+const SUBJ_COLORS = ["sinh", "toan", "van", "ly", "hoa", "anh", "su", "dia", "gdcd", "ielts"];
+function subjColor(s) { const i = ((s.id - 1) % SUBJ_COLORS.length + SUBJ_COLORS.length) % SUBJ_COLORS.length; return SUBJ_COLORS[i]; }
+function renderLandingSubjects() {
+  const grid = $("#landingSubjects");
+  if (!grid) return;
+  grid.innerHTML = subjects.map((s, i) => `
+    <div class="subject-card" role="button" tabindex="0" data-reveal style="--reveal-delay:${Math.min(i, 5) * 60}ms" onclick="previewSubject(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();previewSubject(${s.id})}">
+      <span class="subj-ic subj-${subjColor(s)}">${esc(s.code || s.name.slice(0, 2))}</span><h3>${esc(s.name)}</h3><p>${esc(s.desc || "Học từ tài liệu của môn này")}</p>
+      <div class="row"><span>${esc(s.lessons || "20 bài")}</span><span>Mở lộ trình</span></div>
+    </div>`).join("");
+  observeReveals(grid);
+}
+function previewSubject(id) { demoMode = true; enterApp(); openSubject(id); }
 async function loadSubjectsFromApi() {
   try { const list = await api("/subjects"); if (Array.isArray(list) && list.length) subjects = list.map((s, i) => ({...s, code: (s.name || "?").slice(0, 2), desc: "", progress: 0, lessons: ""})); } catch (e) { /* giu demo */ }
 }
@@ -413,6 +459,7 @@ function loadQuizQuestions() {
   currentLessonTitle = "";
   if (progress.hearts <= 0) { quizQs = []; startQuizRun(); return; } // H8: het tim thi chan
   if (!demoMode) {
+    $("#quizBox").innerHTML = `<p class="meta">Đang tạo câu hỏi mới…</p>`;
     api(`/subjects/${sid}/quiz/generate`, {method: "POST", body: JSON.stringify({n: 5})})
       .then((d) => { quizQs = d.questions.map((q) => ({...q, qtype: "mcq", answer_idx: null, _api: true})); startQuizRun(); })
       .catch(() => { quizQs = demoQuestions(sid); startQuizRun(); });
@@ -617,13 +664,13 @@ async function uploadFromChat() {
   const f = $("#chatFile").files[0];
   const msg = $("#chatUploadMsg");
   if (!f) { msg.textContent = "Hãy chọn một file PDF, DOCX, TXT hoặc MD trước."; return; }
+  const sid = Number($("#chatSubject").value || subjects[0].id);
   if (demoMode) {
     docs.unshift({id: Date.now(), title: f.name, subject: subjectName(sid), status: "indexing", chunks: 0, size: (f.size / 1048576).toFixed(1) + " MB"});
     renderDocs();
     msg.textContent = "Demo: đã nhận “" + f.name + "”. Khi backend chạy, file sẽ được lập chỉ mục thật.";
     return;
   }
-  const sid = Number($("#chatSubject").value || subjects[0].id);
   const fd = new FormData(); fd.append("file", f);
   try {
     const r = await apiForm(`/subjects/${sid}/docs`, fd);
@@ -710,10 +757,10 @@ function renderEssayResult(r) {
     <div class="essay-total"><b class="num">${r.total}</b><span>/ ${r.max_total} điểm · ${r.mode === "llm" ? "Chấm bằng AI theo barem" : "Chấm tạm — cần backend để chấm thật"}</span></div>
     <p style="margin-top:8px;color:var(--ink-2);font-size:15px">${esc(r.overall || "")}</p>
     <div style="height:16px"></div>
-    <table><thead><tr><th>Tiêu chí</th><th class="num">Điểm</th><th>Nhận xét và gợi ý sửa</th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th>Tiêu chí</th><th class="num">Điểm</th><th>Nhận xét và gợi ý sửa</th></tr></thead><tbody>
     ${r.scores.map((s) => `<tr><td><b>${esc(s.criterion)}</b>${s.quote ? `<br><span class="meta">Trích bài làm: “${esc(s.quote)}”</span>` : ""}</td>
       <td class="num"><b>${s.score}</b> / ${s.max}</td><td>${esc(s.feedback)}<div class="score-bar" style="margin-top:6px"><span style="width:${Math.round(s.score / s.max * 100)}%"></span></div></td></tr>`).join("")}
-    </tbody></table>
+    </tbody></table></div>
     <p class="meta" style="margin-top:12px">Điểm này do AI chấm theo barem. Giáo viên duyệt và sửa điểm trước khi gửi cho học sinh.</p>
     <div style="height:12px"></div>
     <button class="btn btn-outline" onclick="sendToTeacher(this)">Gửi cho giáo viên duyệt</button><span class="meta" id="essaySent"></span>`;
@@ -860,8 +907,28 @@ $("#pathSubject").addEventListener("change", renderPath);
 $("#quizSubject").addEventListener("change", loadQuizQuestions);
 $("#chatSubject").addEventListener("change", () => { syncSubjectLabels(); renderChatDocs(); });
 
+/* ---------- Entrance (IntersectionObserver) ----------
+   Noi dung hien mac dinh; chi khi trinh duyet ho tro IO va user khong giam
+   motion thi JS moi them class anim de reveal chay. Khong bao gio gate su
+   ton tai cua content vao JS. */
+let revealObserver = null;
+function initReveal() {
+  if (!("IntersectionObserver" in window)) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.documentElement.classList.add("anim");
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in-view"); revealObserver.unobserve(e.target); } });
+  }, {threshold: 0.12, rootMargin: "0px 0px -8% 0px"});
+  observeReveals(document);
+}
+function observeReveals(root) {
+  if (!revealObserver || !root) return;
+  root.querySelectorAll("[data-reveal]:not(.in-view)").forEach((el) => revealObserver.observe(el));
+}
+
 /* ---------- Init ---------- */
 (async function init() {
+  initReveal();
   await checkHealth();
   loadProgress();
   try { const savedRemind = localStorage.getItem("tuhoc_remind"); if (savedRemind) $("#remindTime").value = savedRemind; } catch (e) {}
