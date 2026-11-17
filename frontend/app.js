@@ -5,8 +5,10 @@
 "use strict";
 
 /* ---------- API client ---------- */
-const API_BASE = (location.port === "8000" || location.hostname === "127.0.0.1")
-  ? "" : "http://127.0.0.1:8000";
+/* API cung origin voi trang web, tru khi mo bang demo server 8901 thi goi backend 8000.
+   ponytail: logic cu (port != 8000 -> localhost:8000) lam hong Render: trang Render
+   (port 443) lai goi sang localhost cua nguoi dung, noi khong co backend -> login that bai. */
+const API_BASE = (location.port === "8901") ? "http://127.0.0.1:8000" : "";
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
